@@ -1,4 +1,4 @@
-const API_URL = 'https://script.google.com/macros/s/AKfycbynKe5GKkqUs-nKq9JRlBMJ0TrltZtrSrkt0f4z8QIUfMmdau14kkdct_3b-kK67YE/exec';
+const API_URL = '/api/inquiries';
 
 export async function fetchInquiries() {
   const res = await fetch(`${API_URL}?action=list`, {

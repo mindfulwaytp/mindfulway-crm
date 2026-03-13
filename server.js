@@ -63,7 +63,7 @@ async function start() {
   app.use(vite.middlewares);
 
   app.listen(5173, () => {
-    console.log('Dev server running at http://localhost:5173');
+    console.log('Dev server running at https://mindfulway-crm.pages.dev/');
   });
 }
 
