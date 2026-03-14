@@ -461,8 +461,9 @@ export default function App() {
   const [isEditing, setIsEditing] = useState(false);
   const [draftInquiry, setDraftInquiry] = useState(null);
   const [saving, setSaving] = useState(false);
-  
+  const [collapsedColumns, setCollapsedColumns] = useState({});
 
+  
   useEffect(() => {
   async function loadIntakes() {
     try {
@@ -508,6 +509,13 @@ export default function App() {
     setDraftInquiry(cloneData(selectedInquiry));
     setIsEditing(false);
   }
+
+    function toggleColumn(columnId) {
+      setCollapsedColumns((prev) => ({
+        ...prev,
+        [columnId]: !prev[columnId],
+      }));
+    }
 
   function updateDraft(path, value) {
     setDraftInquiry((prev) => {
@@ -576,7 +584,7 @@ export default function App() {
     setSaving(false);
   }
 }
-
+  
 
   async function handleDragEnd(result) {
   const { destination, source, draggableId } = result;
@@ -782,14 +790,17 @@ export default function App() {
                         (intake) => intake.pipeline?.status === column.id
                       );
 
+                      const isCollapsed = collapsedColumns[column.id];
+
                       return (
                         <Droppable droppableId={column.id} key={column.id}>
+
                           {(provided, snapshot) => (
                             <div
                               ref={provided.innerRef}
                               {...provided.droppableProps}
                               style={{
-                                width: 300,
+                                width: isCollapsed ? 140 : 300,
                                 flexShrink: 0,
                                 background: snapshot.isDraggingOver ? '#ffffff' : '#fafafa',
                                 borderRadius: 16,
@@ -801,114 +812,163 @@ export default function App() {
                               }}
                             >
                               <div
-                                style={{
-                                  background: column.color,
-                                  padding: '12px 14px',
-                                  borderBottom: `1px solid ${column.border}`,
-                                  display: 'flex',
-                                  justifyContent: 'space-between',
-                                  alignItems: 'center',
-                                }}
-                              >
+                              style={{
+                                background: column.color,
+                                padding: '12px 14px',
+                                borderBottom: `1px solid ${column.border}`,
+                                display: 'flex',
+                                justifyContent: 'space-between',
+                                alignItems: 'center',
+                                gap: 8,
+                              }}
+                            >
+                              <div style={{ minWidth: 0, flex: 1 }}>
                                 <h3
                                   style={{
                                     margin: 0,
                                     fontSize: 16,
                                     fontWeight: 600,
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
                                   }}
                                 >
                                   {column.title}
                                 </h3>
-
-                                <span
-                                  style={{
-                                    fontSize: 12,
-                                    fontWeight: 600,
-                                    background: '#fff',
-                                    border: `1px solid ${column.border}`,
-                                    borderRadius: 999,
-                                    padding: '2px 8px',
-                                  }}
-                                >
-                                  {columnCards.length}
-                                </span>
                               </div>
 
-                              <div style={{ padding: 12 }}>
-                                {columnCards.map((card, index) => (
-                                  <Draggable
-                                    draggableId={card.id}
-                                    index={index}
-                                    key={card.id}
-                                  >
-                                    {(providedDraggable, snapshotDraggable) => (
-                                      <div
-                                        ref={providedDraggable.innerRef}
-                                        {...providedDraggable.draggableProps}
-                                        {...providedDraggable.dragHandleProps}
-                                        onClick={() => openInquiry(card)}
-                                        style={{
-                                          background: '#fff',
-                                          borderRadius: 12,
-                                          padding: 12,
-                                          marginBottom: 10,
-                                          boxShadow: snapshotDraggable.isDragging
-                                            ? '0 8px 20px rgba(0,0,0,0.12)'
-                                            : '0 1px 3px rgba(0,0,0,0.1)',
-                                          border:
-                                            selectedInquiry?.id === card.id
-                                              ? '1px solid #7c3aed'
-                                              : updatingId === card.id
-                                              ? '1px solid #7c3aed'
-                                              : '1px solid #ececec',
-                                          cursor: 'pointer',
-                                          ...providedDraggable.draggableProps.style,
-                                        }}
-                                      >
-                                        <strong>
-                                          {card.intake?.clientName || 'No name'}
-                                        </strong>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <span
+                              style={{
+                                fontSize: 12,
+                                fontWeight: 600,
+                                background: '#fff',
+                                border: `1px solid ${column.border}`,
+                                borderRadius: 999,
+                                padding: '2px 8px',
+                              }}
+                            >
+                              {columnCards.length}
+                            </span>
 
+                            <button
+                              type="button"
+                              onClick={() => toggleColumn(column.id)}
+                              style={{
+                                border: `1px solid ${column.border}`,
+                                background: '#fff',
+                                borderRadius: 8,
+                                padding: '4px 8px',
+                                cursor: 'pointer',
+                                fontSize: 12,
+                                fontWeight: 600,
+                              }}
+                            >
+                              {isCollapsed ? 'Expand' : 'Collapse'}
+                            </button>
+                          </div>
+                        </div>
+
+
+                              {isCollapsed ? (
+                                <div
+                                  style={{
+                                    padding: 12,
+                                    fontSize: 13,
+                                    color: '#6b7280',
+                                  }}
+                                >
+                                  Collapsed
+                                  {provided.placeholder}
+                                </div>
+                              ) : (
+                                <div style={{ padding: 12 }}>
+                                  {columnCards.map((card, index) => (
+                                    <Draggable
+                                      draggableId={card.id}
+                                      index={index}
+                                      key={card.id}
+                                    >
+                                      {(providedDraggable, snapshotDraggable) => (
                                         <div
+                                          ref={providedDraggable.innerRef}
+                                          {...providedDraggable.draggableProps}
+                                          {...providedDraggable.dragHandleProps}
+                                          onClick={() => openInquiry(card)}
                                           style={{
-                                            fontSize: 13,
-                                            marginTop: 6,
-                                            color: '#555',
+                                            background: '#fff',
+                                            borderRadius: 12,
+                                            padding: 12,
+                                            marginBottom: 10,
+                                            boxShadow: snapshotDraggable.isDragging
+                                              ? '0 8px 20px rgba(0,0,0,0.12)'
+                                              : '0 1px 3px rgba(0,0,0,0.1)',
+                                            border:
+                                              selectedInquiry?.id === card.id
+                                                ? '1px solid #7c3aed'
+                                                : updatingId === card.id
+                                                ? '1px solid #7c3aed'
+                                                : '1px solid #ececec',
+                                            cursor: 'pointer',
+                                            ...providedDraggable.draggableProps.style,
                                           }}
                                         >
-                                          Insurance: {card.intake?.insurance || '—'}
-                                        </div>
+                                          <strong>
+                                            {card.intake?.clientName || 'No name'}
+                                          </strong>
 
-                                        {card.intake?.preferredProvider ? (
+                                          <div
+                                            style={{
+                                              fontSize: 12,
+                                              marginTop: 4,
+                                              color: '#6b7280',
+                                            }}
+                                          >
+                                            {formatDate(card.createdAt)}
+                                          </div>
+
                                           <div
                                             style={{
                                               fontSize: 13,
-                                              marginTop: 4,
+                                              marginTop: 6,
                                               color: '#555',
                                             }}
                                           >
-                                            Pref. Provider: {card.intake.preferredProvider}
+                                            Insurance: {card.intake?.insurance || '—'}
                                           </div>
-                                        ) : null}
-                                      </div>
-                                    )}
-                                  </Draggable>
-                                ))}
 
-                                {provided.placeholder}
+                                          {card.intake?.preferredProvider ? (
+                                            <div
+                                              style={{
+                                                fontSize: 13,
+                                                marginTop: 4,
+                                                color: '#555',
+                                              }}
+                                            >
+                                              Pref. Provider: {card.intake.preferredProvider}
+                                            </div>
+                                          ) : null}
+                                        </div>
+                                      )}
+                                    </Draggable>
+                                  ))}
 
-                                {columnCards.length === 0 ? (
-                                  <p
-                                    style={{
-                                      fontSize: 13,
-                                      color: '#666',
-                                      marginTop: 8,
-                                    }}
-                                  >
-                                    No records
-                                  </p>
-                                ) : null}
-                              </div>
+                                  {provided.placeholder}
+
+                                  {columnCards.length === 0 ? (
+                                    <p
+                                      style={{
+                                        fontSize: 13,
+                                        color: '#666',
+                                        marginTop: 8,
+                                      }}
+                                    >
+                                      No records
+                                    </p>
+                                  ) : null}
+                                </div>
+                              )}
+
                             </div>
                           )}
                         </Droppable>
