@@ -800,13 +800,13 @@ export default function App() {
                               ref={provided.innerRef}
                               {...provided.droppableProps}
                               style={{
-                                width: isCollapsed ? 140 : 300,
+                                width: isCollapsed ? 300 : '100%',
                                 flexShrink: 0,
                                 background: snapshot.isDraggingOver ? '#ffffff' : '#fafafa',
                                 borderRadius: 16,
                                 border: `1px solid ${column.border}`,
                                 overflow: 'hidden',
-                                minHeight: 240,
+                                minHeight: isCollapsed ? 'auto' : 240,
                                 boxShadow: '0 1px 3px rgba(0,0,0,0.06)',
                                 transition: 'all 0.2s ease',
                               }}
@@ -864,24 +864,13 @@ export default function App() {
                                 fontWeight: 600,
                               }}
                             >
-                              {isCollapsed ? 'Expand' : 'Collapse'}
+                              {isCollapsed ? 'Show' : 'Hide'}
                             </button>
                           </div>
                         </div>
 
 
-                              {isCollapsed ? (
-                                <div
-                                  style={{
-                                    padding: 12,
-                                    fontSize: 13,
-                                    color: '#6b7280',
-                                  }}
-                                >
-                                  Collapsed
-                                  {provided.placeholder}
-                                </div>
-                              ) : (
+                              {!isCollapsed ? (
                                 <div style={{ padding: 12 }}>
                                   {columnCards.map((card, index) => (
                                     <Draggable
@@ -967,7 +956,12 @@ export default function App() {
                                     </p>
                                   ) : null}
                                 </div>
+                              ) : (
+                                <div style={{ height: 0, overflow: 'hidden' }}>
+                                  {provided.placeholder}
+                                </div>
                               )}
+
 
                             </div>
                           )}
