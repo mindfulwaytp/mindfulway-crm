@@ -69,36 +69,405 @@ function DetailPanel({
     color: '#374151',
   };
 
-return (
-  <div
-    onClick={onClose}
-    style={{
-      position: 'fixed',
-      inset: 0,
-      background: 'rgba(15, 23, 42, 0.35)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: 24,
-      zIndex: 1000,
-    }}
-  >
+  return (
     <div
-      onClick={(e) => e.stopPropagation()}
+      onClick={onClose}
       style={{
-        width: 'min(760px, 100%)',
-        maxHeight: '90vh',
-        background: '#fff',
-        borderRadius: 20,
-        boxShadow: '0 20px 60px rgba(0,0,0,0.18)',
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(15, 23, 42, 0.35)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
         padding: 24,
-        overflowY: 'auto',
+        zIndex: 1000,
       }}
     >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: 'min(760px, 100%)',
+          maxHeight: '90vh',
+          background: '#fff',
+          borderRadius: 20,
+          boxShadow: '0 20px 60px rgba(0,0,0,0.18)',
+          padding: 24,
+          overflowY: 'auto',
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            marginBottom: 20,
+            gap: 12,
+          }}
+        >
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <h2 style={{ margin: 0, fontSize: 24 }}>
+              {record.intake?.clientName || 'No name'}
+            </h2>
+            {record.intake?.preferredName ? (
+              <p style={{ marginTop: 6, color: '#6b7280' }}>
+                Preferred name: {record.intake.preferredName}
+              </p>
+            ) : null}
+          </div>
+
+          <button
+            onClick={onClose}
+            style={{
+              border: '1px solid #e5e7eb',
+              background: '#fff',
+              borderRadius: 10,
+              padding: '8px 10px',
+              cursor: 'pointer',
+              fontWeight: 600,
+              flexShrink: 0,
+            }}
+          >
+            Close
+          </button>
         </div>
-  </div>
-);
+
+        <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+          {!isEditing ? (
+            <button
+              onClick={onEdit}
+              style={{
+                border: '1px solid #e5e7eb',
+                background: '#fff',
+                borderRadius: 10,
+                padding: '8px 12px',
+                cursor: 'pointer',
+                fontWeight: 600,
+              }}
+            >
+              Edit
+            </button>
+          ) : (
+            <>
+              <button
+                onClick={onSave}
+                disabled={saving}
+                style={{
+                  border: '1px solid #7c3aed',
+                  background: '#7c3aed',
+                  color: '#fff',
+                  borderRadius: 10,
+                  padding: '8px 12px',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                  opacity: saving ? 0.7 : 1,
+                }}
+              >
+                {saving ? 'Saving...' : 'Save'}
+              </button>
+
+              <button
+                onClick={onCancel}
+                disabled={saving}
+                style={{
+                  border: '1px solid #e5e7eb',
+                  background: '#fff',
+                  borderRadius: 10,
+                  padding: '8px 12px',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                }}
+              >
+                Cancel
+              </button>
+            </>
+          )}
+        </div>
+
+        <div
+          style={{
+            border: '1px solid #e5e7eb',
+            borderRadius: 14,
+            padding: 16,
+            marginBottom: 16,
+            background: '#fafafa',
+          }}
+        >
+          <h3 style={{ marginTop: 0, marginBottom: 12, fontSize: 16 }}>Pipeline</h3>
+
+          <div style={{ display: 'grid', gap: 14, fontSize: 14 }}>
+            <div>
+              <label style={labelStyle}>Status</label>
+              {isEditing ? (
+                <select
+                  value={record.pipeline?.status || 'new'}
+                  onChange={(e) => onChange('pipeline.status', e.target.value)}
+                  style={inputStyle}
+                >
+                  <option value="new">New</option>
+                  <option value="contact1">Contact 1</option>
+                  <option value="contact2">Contact 2</option>
+                  <option value="scheduled">Scheduled</option>
+                  <option value="waitlist">Waitlist</option>
+                </select>
+              ) : (
+                <div>{record.pipeline?.status || '—'}</div>
+              )}
+            </div>
+
+            <div>
+              <label style={labelStyle}>Assigned Provider</label>
+              {isEditing ? (
+                <input
+                  type="text"
+                  value={record.pipeline?.assignedProvider || ''}
+                  onChange={(e) => onChange('pipeline.assignedProvider', e.target.value)}
+                  style={inputStyle}
+                />
+              ) : (
+                <div>{record.pipeline?.assignedProvider || '—'}</div>
+              )}
+            </div>
+
+            <div>
+              <label style={labelStyle}>Contact Attempts</label>
+              {isEditing ? (
+                <input
+                  type="number"
+                  min="0"
+                  value={record.pipeline?.contactAttempts ?? 0}
+                  onChange={(e) =>
+                    onChange('pipeline.contactAttempts', Number(e.target.value) || 0)
+                  }
+                  style={inputStyle}
+                />
+              ) : (
+                <div>{record.pipeline?.contactAttempts ?? 0}</div>
+              )}
+            </div>
+
+            <div>
+              <label style={labelStyle}>Last Contact</label>
+              {isEditing ? (
+                <input
+                  type="text"
+                  value={record.pipeline?.lastContactDate || ''}
+                  onChange={(e) => onChange('pipeline.lastContactDate', e.target.value)}
+                  placeholder="MM/DD/YYYY or leave blank"
+                  style={inputStyle}
+                />
+              ) : (
+                <div>{formatDate(record.pipeline?.lastContactDate)}</div>
+              )}
+            </div>
+
+            <div>
+              <label style={labelStyle}>Next Step</label>
+              {isEditing ? (
+                <input
+                  type="text"
+                  value={record.pipeline?.nextStep || ''}
+                  onChange={(e) => onChange('pipeline.nextStep', e.target.value)}
+                  style={inputStyle}
+                />
+              ) : (
+                <div>{record.pipeline?.nextStep || '—'}</div>
+              )}
+            </div>
+
+            <div>
+              <label style={labelStyle}>Archived</label>
+              {isEditing ? (
+                <select
+                  value={record.pipeline?.archived ? 'true' : 'false'}
+                  onChange={(e) =>
+                    onChange('pipeline.archived', e.target.value === 'true')
+                  }
+                  style={inputStyle}
+                >
+                  <option value="false">No</option>
+                  <option value="true">Yes</option>
+                </select>
+              ) : (
+                <div>{record.pipeline?.archived ? 'Yes' : 'No'}</div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div
+          style={{
+            border: '1px solid #e5e7eb',
+            borderRadius: 14,
+            padding: 16,
+            background: '#fff',
+          }}
+        >
+          <h3 style={{ marginTop: 0, marginBottom: 12, fontSize: 16 }}>
+            Intake Details
+          </h3>
+
+          <div style={{ display: 'grid', gap: 14, fontSize: 14 }}>
+            <div>
+              <label style={labelStyle}>Client Name</label>
+              {isEditing ? (
+                <input
+                  type="text"
+                  value={record.intake?.clientName || ''}
+                  onChange={(e) => onChange('intake.clientName', e.target.value)}
+                  style={inputStyle}
+                />
+              ) : (
+                <div>{record.intake?.clientName || '—'}</div>
+              )}
+            </div>
+
+            <div>
+              <label style={labelStyle}>Preferred Name</label>
+              {isEditing ? (
+                <input
+                  type="text"
+                  value={record.intake?.preferredName || ''}
+                  onChange={(e) => onChange('intake.preferredName', e.target.value)}
+                  style={inputStyle}
+                />
+              ) : (
+                <div>{record.intake?.preferredName || '—'}</div>
+              )}
+            </div>
+
+            <div>
+              <label style={labelStyle}>Insurance</label>
+              {isEditing ? (
+                <input
+                  type="text"
+                  value={record.intake?.insurance || ''}
+                  onChange={(e) => onChange('intake.insurance', e.target.value)}
+                  style={inputStyle}
+                />
+              ) : (
+                <div>{record.intake?.insurance || '—'}</div>
+              )}
+            </div>
+
+            <div>
+              <label style={labelStyle}>Phone</label>
+              {isEditing ? (
+                <input
+                  type="text"
+                  value={record.intake?.phone || ''}
+                  onChange={(e) => onChange('intake.phone', e.target.value)}
+                  style={inputStyle}
+                />
+              ) : (
+                <div>{record.intake?.phone || '—'}</div>
+              )}
+            </div>
+
+            <div>
+              <label style={labelStyle}>Email</label>
+              {isEditing ? (
+                <input
+                  type="email"
+                  value={record.intake?.email || ''}
+                  onChange={(e) => onChange('intake.email', e.target.value)}
+                  style={inputStyle}
+                />
+              ) : (
+                <div>{record.intake?.email || '—'}</div>
+              )}
+            </div>
+
+            <div>
+              <label style={labelStyle}>Preferred Provider</label>
+              {isEditing ? (
+                <input
+                  type="text"
+                  value={record.intake?.preferredProvider || ''}
+                  onChange={(e) => onChange('intake.preferredProvider', e.target.value)}
+                  style={inputStyle}
+                />
+              ) : (
+                <div>{record.intake?.preferredProvider || '—'}</div>
+              )}
+            </div>
+
+            <div>
+              <label style={labelStyle}>Services Requested</label>
+              {isEditing ? (
+                <input
+                  type="text"
+                  value={record.intake?.servicesRequested || ''}
+                  onChange={(e) => onChange('intake.servicesRequested', e.target.value)}
+                  style={inputStyle}
+                />
+              ) : (
+                <div>{record.intake?.servicesRequested || '—'}</div>
+              )}
+            </div>
+
+            <div>
+              <label style={labelStyle}>DOB</label>
+              {isEditing ? (
+                <input
+                  type="text"
+                  value={record.intake?.dob || ''}
+                  onChange={(e) => onChange('intake.dob', e.target.value)}
+                  placeholder="MM/DD/YYYY or leave blank"
+                  style={inputStyle}
+                />
+              ) : (
+                <div>{formatDate(record.intake?.dob)}</div>
+              )}
+            </div>
+
+            <div>
+              <label style={labelStyle}>Problems</label>
+              {isEditing ? (
+                <textarea
+                  value={record.intake?.problems || ''}
+                  onChange={(e) => onChange('intake.problems', e.target.value)}
+                  rows={3}
+                  style={{ ...inputStyle, resize: 'vertical' }}
+                />
+              ) : (
+                <div>{record.intake?.problems || '—'}</div>
+              )}
+            </div>
+
+            <div>
+              <label style={labelStyle}>Safety</label>
+              {isEditing ? (
+                <textarea
+                  value={record.intake?.safety || ''}
+                  onChange={(e) => onChange('intake.safety', e.target.value)}
+                  rows={2}
+                  style={{ ...inputStyle, resize: 'vertical' }}
+                />
+              ) : (
+                <div>{record.intake?.safety || '—'}</div>
+              )}
+            </div>
+
+            <div>
+              <label style={labelStyle}>Availability</label>
+              {isEditing ? (
+                <textarea
+                  value={record.intake?.availability || ''}
+                  onChange={(e) => onChange('intake.availability', e.target.value)}
+                  rows={2}
+                  style={{ ...inputStyle, resize: 'vertical' }}
+                />
+              ) : (
+                <div>{record.intake?.availability || '—'}</div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
+
 
 export default function App() {
   const [intakes, setIntakes] = useState([]);
