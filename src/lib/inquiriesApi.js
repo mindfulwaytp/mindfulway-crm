@@ -42,14 +42,21 @@ export async function updateInquiry(id, updates) {
   });
 }
 
-export function subscribeToInquiries(callback) {
+export function subscribeToInquiries(callback, onError) {
   const q = query(inquiriesRef, orderBy('createdAt', 'desc'));
 
-  return onSnapshot(q, (snap) => {
-    const data = snap.docs.map((d) => ({
-      id: d.id,
-      ...d.data(),
-    }));
-    callback(data);
-  });
+  return onSnapshot(
+    q,
+    (snap) => {
+      const data = snap.docs.map((d) => ({
+        id: d.id,
+        ...d.data(),
+      }));
+      callback(data);
+    },
+    (error) => {
+      console.error('subscribeToInquiries error:', error);
+      if (onError) onError(error);
+    }
+  );
 }

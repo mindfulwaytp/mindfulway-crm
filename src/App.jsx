@@ -5,9 +5,8 @@ import {
   Draggable,
 } from '@hello-pangea/dnd';
 import {
-  fetchInquiries,
+  subscribeToInquiries,
   updateInquiry as updateInquiryApi,
-  createInquiry,
 } from './lib/inquiriesApi';
 
 
@@ -641,23 +640,20 @@ export default function App() {
 
   
   useEffect(() => {
-  async function loadIntakes() {
-    try {
-      const rows = await fetchInquiries();
+  setError('');
+
+  const unsubscribe = subscribeToInquiries(
+    (rows) => {
       setIntakes(rows);
-    } catch (err) {
-      setError(err.message || 'Failed to load intakes');
-    } finally {
+      setLoading(false);
+    },
+    (err) => {
+      setError(err.message || 'Failed to subscribe to inquiries');
       setLoading(false);
     }
-  }
+  );
 
-  loadIntakes();
-
-  // 🔄 refresh every 10 seconds
-  const interval = setInterval(loadIntakes, 10000);
-
-  return () => clearInterval(interval);
+  return () => unsubscribe();
 }, []);
 
 
@@ -714,44 +710,6 @@ export default function App() {
     });
   }
 
-
-  async function testFirestoreWrite() {
-  setError('');
-
-  try {
-    const id = await createInquiry({
-      source: 'manual-test',
-      intake: {
-        clientName: 'Test Client',
-        preferredName: '',
-        email: 'test@example.com',
-        phone: '555-555-5555',
-        insurance: 'Premera',
-        servicesRequested: ['therapy'],
-        preferredProvider: '',
-        dob: '',
-        problems: 'Firestore test',
-        safety: '',
-        availability: 'Afternoons',
-      },
-      pipeline: {
-        status: 'new',
-        assignedProvider: '',
-        lastContactDate: null,
-        nextStep: '',
-        contactAttempts: 0,
-        archived: false,
-      },
-    });
-
-    console.log('Created inquiry:', id);
-
-    const rows = await fetchInquiries();
-    setIntakes(rows);
-  } catch (err) {
-    setError(err.message || 'Failed to write test inquiry');
-  }
-}
   async function handleSaveEdit() {
   if (!selectedInquiry || !draftInquiry) return;
 
@@ -943,21 +901,6 @@ export default function App() {
     All Inquiries
   </button>
 
-  <button
-    onClick={testFirestoreWrite}
-    style={{
-      textAlign: 'left',
-      padding: '12px 14px',
-      borderRadius: 10,
-      border: '1px solid #d1d5db',
-      background: '#fff',
-      fontWeight: 600,
-      cursor: 'pointer',
-      marginTop: 12,
-    }}
-  >
-    Test Firestore
-  </button>
 </nav>
       </aside>
 
