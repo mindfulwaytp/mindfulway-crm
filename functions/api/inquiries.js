@@ -3,19 +3,56 @@ const APPS_SCRIPT_URL =
 
 export async function onRequest(context) {
   try {
-    const url = new URL(context.request.url);
-    const action = url.searchParams.get("action");
+    const request = context.request;
+    const url = new URL(request.url);
 
-    const response = await fetch(`${APPS_SCRIPT_URL}?action=${action}`);
+    if (request.method === "GET") {
+      const action = url.searchParams.get("action") || "list";
 
-    const data = await response.text();
+      const response = await fetch(`${APPS_SCRIPT_URL}?action=${action}`, {
+        method: "GET",
+      });
 
-    return new Response(data, {
-      headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
-      },
-    });
+      const text = await response.text();
+
+      return new Response(text, {
+        status: response.status,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+    }
+
+    if (request.method === "POST") {
+      const body = await request.text();
+
+      const response = await fetch(APPS_SCRIPT_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "text/plain;charset=utf-8",
+        },
+        body,
+      });
+
+      const text = await response.text();
+
+      return new Response(text, {
+        status: response.status,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+    }
+
+    return new Response(
+      JSON.stringify({ error: "Method not allowed" }),
+      {
+        status: 405,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
   } catch (err) {
     return new Response(
       JSON.stringify({
@@ -24,7 +61,9 @@ export async function onRequest(context) {
       }),
       {
         status: 500,
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
       }
     );
   }
