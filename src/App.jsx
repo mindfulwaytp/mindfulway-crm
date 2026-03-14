@@ -308,6 +308,7 @@ function DetailPanel({
                     <option value="contact2">Contact 2</option>
                     <option value="scheduled">Scheduled</option>
                     <option value="waitlist">Waitlist</option>
+                    <option value="archived">Archived</option>
                   </select>
                 ) : (
                   <div style={readValueStyle}>{record.pipeline?.status || '—'}</div>
@@ -389,25 +390,6 @@ function DetailPanel({
                 )}
               </div>
 
-              <div>
-                <label style={labelStyle}>Archived</label>
-                {isEditing ? (
-                  <select
-                    value={record.pipeline?.archived ? 'true' : 'false'}
-                    onChange={(e) =>
-                      onChange('pipeline.archived', e.target.value === 'true')
-                    }
-                    style={inputStyle}
-                  >
-                    <option value="false">No</option>
-                    <option value="true">Yes</option>
-                  </select>
-                ) : (
-                  <div style={readValueStyle}>
-                    {record.pipeline?.archived ? 'Yes' : 'No'}
-                  </div>
-                )}
-              </div>
             </div>
           </div>
 
@@ -778,7 +760,6 @@ export default function App() {
       'pipeline.contactAttempts': updatedRecord.pipeline?.contactAttempts ?? 0,
       'pipeline.lastContactDate': updatedRecord.pipeline?.lastContactDate || '',
       'pipeline.nextStep': updatedRecord.pipeline?.nextStep || '',
-      'pipeline.archived': updatedRecord.pipeline?.archived ? true : false,
     };
 
     await updateInquiryApi(selectedInquiry.id, changes);
