@@ -800,7 +800,7 @@ export default function App() {
                               ref={provided.innerRef}
                               {...provided.droppableProps}
                               style={{
-                                width: isCollapsed ? 300 : '100%',
+                                width: 300,
                                 flexShrink: 0,
                                 background: snapshot.isDraggingOver ? '#ffffff' : '#fafafa',
                                 borderRadius: 16,
