@@ -461,6 +461,7 @@ export default function App() {
   const [isEditing, setIsEditing] = useState(false);
   const [draftInquiry, setDraftInquiry] = useState(null);
   const [saving, setSaving] = useState(false);
+  
 
   useEffect(() => {
   async function loadIntakes() {
@@ -475,7 +476,13 @@ export default function App() {
   }
 
   loadIntakes();
+
+  // 🔄 refresh every 10 seconds
+  const interval = setInterval(loadIntakes, 10000);
+
+  return () => clearInterval(interval);
 }, []);
+
 
 
   function openInquiry(inquiry) {
