@@ -63,7 +63,7 @@ fs.createReadStream("inquiries.csv")
     },
 
     pipeline: {
-      status: "new",
+      status: row["Status"] || "new",
       assignedProvider: "",
       contactAttempts: 0,
       archived: false

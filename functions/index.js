@@ -71,7 +71,7 @@ export const jotformWebhook = onRequest(async (req, res) => {
       ? raw.q35_promptedYou.join(", ")
       : raw.q35_promptedYou || "";
 
-    const problemChecklist = Array.isArray(raw.q34_whatProblems)
+    const tags = Array.isArray(raw.q34_whatProblems)
       ? raw.q34_whatProblems.join(", ")
       : raw.q34_whatProblems || "";
 
@@ -118,7 +118,7 @@ export const jotformWebhook = onRequest(async (req, res) => {
         parentLastName: raw.q15_parentguardianName?.last || "",
         tags: "",
         promptedYou,
-        problemChecklist,
+        problemChecklist: tags,
         previousTherapy: raw.q36_haveYou || "",
         previousMeds: raw.q38_haveYou38 || "",
         safety: raw.q39_haveYou39 || "",
