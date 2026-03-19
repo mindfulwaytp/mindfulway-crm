@@ -287,8 +287,16 @@ function DetailPanel({
               Pipeline
             </h3>
 
-            <div style={{ display: 'grid', gap: 12, fontSize: 14 }}>
-              <div>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                gap: 14,
+                fontSize: 14,
+              }}
+            >
+              {/* Status — spans both columns */}
+              <div style={{ gridColumn: '1 / -1' }}>
                 <label style={labelStyle}>Status</label>
                 {isEditing ? (
                   <select
@@ -320,6 +328,22 @@ function DetailPanel({
                 ) : (
                   <div style={readValueStyle}>
                     {record.pipeline?.assignedProvider || '—'}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label style={labelStyle}>Possible Providers</label>
+                {isEditing ? (
+                  <input
+                    type="text"
+                    value={record.pipeline?.possibleProviders || ''}
+                    onChange={(e) => onChange('pipeline.possibleProviders', e.target.value)}
+                    style={inputStyle}
+                  />
+                ) : (
+                  <div style={readValueStyle}>
+                    {record.pipeline?.possibleProviders || '—'}
                   </div>
                 )}
               </div>
@@ -360,18 +384,24 @@ function DetailPanel({
                 )}
               </div>
 
-              <div>
-                <label style={labelStyle}>Next Step</label>
+              {/* Comments — spans both columns */}
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={labelStyle}>Comments</label>
                 {isEditing ? (
-                  <input
-                    type="text"
-                    value={record.pipeline?.nextStep || ''}
-                    onChange={(e) => onChange('pipeline.nextStep', e.target.value)}
-                    style={inputStyle}
+                  <textarea
+                    value={record.pipeline?.comments || ''}
+                    onChange={(e) => onChange('pipeline.comments', e.target.value)}
+                    placeholder="Add notes or comments..."
+                    style={{
+                      ...inputStyle,
+                      minHeight: 80,
+                      resize: 'vertical',
+                      fontFamily: 'inherit',
+                    }}
                   />
                 ) : (
                   <div style={readValueStyle}>
-                    {record.pipeline?.nextStep || '—'}
+                    {record.pipeline?.comments || '—'}
                   </div>
                 )}
               </div>
@@ -400,185 +430,180 @@ function DetailPanel({
             <div
               style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                gridTemplateColumns: 'repeat(6, minmax(0, 1fr))',
                 gap: 14,
                 fontSize: 14,
               }}
             >
-              <div>
+              {/* Row 1: Client Name | Preferred Name | DOB */}
+              <div style={{ gridColumn: 'span 2' }}>
                 <label style={labelStyle}>Client Name</label>
                 {isEditing ? (
-                  <input
-                    type="text"
-                    value={record.intake?.clientName || ''}
-                    onChange={(e) => onChange('intake.clientName', e.target.value)}
-                    style={inputStyle}
-                  />
+                  <input type="text" value={record.intake?.clientName || ''} onChange={(e) => onChange('intake.clientName', e.target.value)} style={inputStyle} />
                 ) : (
-                  <div style={readValueStyle}>
-                    {record.intake?.clientName || '—'}
-                  </div>
+                  <div style={readValueStyle}>{record.intake?.clientName || '—'}</div>
                 )}
               </div>
-
-              <div>
+              <div style={{ gridColumn: 'span 2' }}>
                 <label style={labelStyle}>Preferred Name</label>
                 {isEditing ? (
-                  <input
-                    type="text"
-                    value={record.intake?.preferredName || ''}
-                    onChange={(e) => onChange('intake.preferredName', e.target.value)}
-                    style={inputStyle}
-                  />
+                  <input type="text" value={record.intake?.preferredName || ''} onChange={(e) => onChange('intake.preferredName', e.target.value)} style={inputStyle} />
                 ) : (
-                  <div style={readValueStyle}>
-                    {record.intake?.preferredName || '—'}
-                  </div>
+                  <div style={readValueStyle}>{record.intake?.preferredName || '—'}</div>
                 )}
               </div>
-
-              <div>
-                <label style={labelStyle}>Insurance</label>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={record.intake?.insurance || ''}
-                    onChange={(e) => onChange('intake.insurance', e.target.value)}
-                    style={inputStyle}
-                  />
-                ) : (
-                  <div style={readValueStyle}>
-                    {record.intake?.insurance || '—'}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label style={labelStyle}>Phone</label>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={record.intake?.phone || ''}
-                    onChange={(e) => onChange('intake.phone', e.target.value)}
-                    style={inputStyle}
-                  />
-                ) : (
-                  <div style={readValueStyle}>
-                    {record.intake?.phone || '—'}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label style={labelStyle}>Email</label>
-                {isEditing ? (
-                  <input
-                    type="email"
-                    value={record.intake?.email || ''}
-                    onChange={(e) => onChange('intake.email', e.target.value)}
-                    style={inputStyle}
-                  />
-                ) : (
-                  <div style={readValueStyle}>
-                    {record.intake?.email || '—'}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label style={labelStyle}>Preferred Provider</label>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={record.intake?.preferredProvider || ''}
-                    onChange={(e) => onChange('intake.preferredProvider', e.target.value)}
-                    style={inputStyle}
-                  />
-                ) : (
-                  <div style={readValueStyle}>
-                    {record.intake?.preferredProvider || '—'}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label style={labelStyle}>Services Requested</label>
-                {isEditing ? (
-                  <input
-                    type="text"
-                    value={record.intake?.servicesRequested || ''}
-                    onChange={(e) => onChange('intake.servicesRequested', e.target.value)}
-                    style={inputStyle}
-                  />
-                ) : (
-                  <div style={readValueStyle}>
-                    {record.intake?.servicesRequested || '—'}
-                  </div>
-                )}
-              </div>
-
-              <div>
+              <div style={{ gridColumn: 'span 2' }}>
                 <label style={labelStyle}>DOB</label>
                 {isEditing ? (
-                  <input
-                    type="text"
-                    value={record.intake?.dob || ''}
-                    onChange={(e) => onChange('intake.dob', e.target.value)}
-                    placeholder="MM/DD/YYYY or leave blank"
-                    style={inputStyle}
-                  />
+                  <input type="text" value={record.intake?.dob || ''} onChange={(e) => onChange('intake.dob', e.target.value)} placeholder="MM/DD/YYYY" style={inputStyle} />
                 ) : (
-                  <div style={readValueStyle}>
-                    {formatDate(record.intake?.dob)}
-                  </div>
+                  <div style={readValueStyle}>{formatDate(record.intake?.dob)}</div>
                 )}
               </div>
 
+              {/* Row 2: Parent Name */}
               <div style={{ gridColumn: '1 / -1' }}>
-                <label style={labelStyle}>What Brought You to Therapy</label>
+                <label style={labelStyle}>Parent / Guardian Name</label>
                 {isEditing ? (
-                  <textarea
-                    value={record.intake?.problems || ''}
-                    onChange={(e) => onChange('intake.problems', e.target.value)}
-                    rows={3}
-                    style={{ ...inputStyle, resize: 'vertical' }}
-                  />
+                  <input type="text" value={`${record.intake?.parentFirstName || ''} ${record.intake?.parentLastName || ''}`.trim()} onChange={(e) => { const parts = e.target.value.split(' '); onChange('intake.parentFirstName', parts[0] || ''); onChange('intake.parentLastName', parts.slice(1).join(' ') || ''); }} style={inputStyle} />
                 ) : (
-                  <div style={readValueStyle}>
-                    {record.intake?.problems || '—'}
-                  </div>
+                  <div style={readValueStyle}>{`${record.intake?.parentFirstName || ''} ${record.intake?.parentLastName || ''}`.trim() || '—'}</div>
                 )}
               </div>
 
+              {/* Row 3: Phone | Email */}
+              <div style={{ gridColumn: 'span 3' }}>
+                <label style={labelStyle}>Phone</label>
+                {isEditing ? (
+                  <input type="text" value={record.intake?.phone || ''} onChange={(e) => onChange('intake.phone', e.target.value)} style={inputStyle} />
+                ) : (
+                  <div style={readValueStyle}>{record.intake?.phone || '—'}</div>
+                )}
+              </div>
+              <div style={{ gridColumn: 'span 3' }}>
+                <label style={labelStyle}>Email</label>
+                {isEditing ? (
+                  <input type="email" value={record.intake?.email || ''} onChange={(e) => onChange('intake.email', e.target.value)} style={inputStyle} />
+                ) : (
+                  <div style={readValueStyle}>{record.intake?.email || '—'}</div>
+                )}
+              </div>
+
+              {/* Row 4: Preferred Provider | Open to Intern */}
+              <div style={{ gridColumn: 'span 3' }}>
+                <label style={labelStyle}>Preferred Provider</label>
+                {isEditing ? (
+                  <input type="text" value={record.intake?.preferredProvider || ''} onChange={(e) => onChange('intake.preferredProvider', e.target.value)} style={inputStyle} />
+                ) : (
+                  <div style={readValueStyle}>{record.intake?.preferredProvider || '—'}</div>
+                )}
+              </div>
+              <div style={{ gridColumn: 'span 3' }}>
+                <label style={labelStyle}>Open to Intern</label>
+                {isEditing ? (
+                  <input type="text" value={record.intake?.openToIntern || ''} onChange={(e) => onChange('intake.openToIntern', e.target.value)} style={inputStyle} />
+                ) : (
+                  <div style={readValueStyle}>{record.intake?.openToIntern || '—'}</div>
+                )}
+              </div>
+
+              {/* Row 5: Insurance | Member ID */}
+              <div style={{ gridColumn: 'span 3' }}>
+                <label style={labelStyle}>Insurance</label>
+                {isEditing ? (
+                  <input type="text" value={record.intake?.insurance || ''} onChange={(e) => onChange('intake.insurance', e.target.value)} style={inputStyle} />
+                ) : (
+                  <div style={readValueStyle}>{record.intake?.insurance || '—'}</div>
+                )}
+              </div>
+              <div style={{ gridColumn: 'span 3' }}>
+                <label style={labelStyle}>Member ID</label>
+                {isEditing ? (
+                  <input type="text" value={record.intake?.memberId || ''} onChange={(e) => onChange('intake.memberId', e.target.value)} style={inputStyle} />
+                ) : (
+                  <div style={readValueStyle}>{record.intake?.memberId || '—'}</div>
+                )}
+              </div>
+
+              {/* Row 6: Services Requested */}
               <div style={{ gridColumn: '1 / -1' }}>
+                <label style={labelStyle}>Services Requested</label>
+                {isEditing ? (
+                  <input type="text" value={record.intake?.servicesRequested || ''} onChange={(e) => onChange('intake.servicesRequested', e.target.value)} style={inputStyle} />
+                ) : (
+                  <div style={readValueStyle}>{record.intake?.servicesRequested || '—'}</div>
+                )}
+              </div>
+
+              {/* Row 7: Problem Checklist */}
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={labelStyle}>Problem Checklist</label>
+                {isEditing ? (
+                  <textarea value={record.intake?.problemChecklist || ''} onChange={(e) => onChange('intake.problemChecklist', e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical' }} />
+                ) : (
+                  <div style={readValueStyle}>{record.intake?.problemChecklist || '—'}</div>
+                )}
+              </div>
+
+              {/* Row 7b: What Prompted You */}
+              <div style={{ gridColumn: '1 / -1' }}>
+                <label style={labelStyle}>What Prompted You</label>
+                {isEditing ? (
+                  <textarea value={record.intake?.promptedYou || ''} onChange={(e) => onChange('intake.promptedYou', e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical' }} />
+                ) : (
+                  <div style={readValueStyle}>{record.intake?.promptedYou || '—'}</div>
+                )}
+              </div>
+
+              {/* Row 8: Prev. Therapy | Meds | Safety */}
+              <div style={{ gridColumn: 'span 2' }}>
+                <label style={labelStyle}>Prev. Therapy</label>
+                {isEditing ? (
+                  <input type="text" value={record.intake?.previousTherapy || ''} onChange={(e) => onChange('intake.previousTherapy', e.target.value)} style={inputStyle} />
+                ) : (
+                  <div style={readValueStyle}>{record.intake?.previousTherapy || '—'}</div>
+                )}
+              </div>
+              <div style={{ gridColumn: 'span 2' }}>
+                <label style={labelStyle}>Meds</label>
+                {isEditing ? (
+                  <input type="text" value={record.intake?.previousMeds || ''} onChange={(e) => onChange('intake.previousMeds', e.target.value)} style={inputStyle} />
+                ) : (
+                  <div style={readValueStyle}>{record.intake?.previousMeds || '—'}</div>
+                )}
+              </div>
+              <div style={{ gridColumn: 'span 2' }}>
                 <label style={labelStyle}>Safety</label>
                 {isEditing ? (
-                  <textarea
-                    value={record.intake?.safety || ''}
-                    onChange={(e) => onChange('intake.safety', e.target.value)}
-                    rows={2}
-                    style={{ ...inputStyle, resize: 'vertical' }}
-                  />
+                  <input type="text" value={record.intake?.safety || ''} onChange={(e) => onChange('intake.safety', e.target.value)} style={inputStyle} />
                 ) : (
-                  <div style={readValueStyle}>
-                    {record.intake?.safety || '—'}
-                  </div>
+                  <div style={readValueStyle}>{record.intake?.safety || '—'}</div>
                 )}
               </div>
 
-              <div style={{ gridColumn: '1 / -1' }}>
-                <label style={labelStyle}>Availability</label>
+              {/* Row 9: Days | Times | IP/Tele */}
+              <div style={{ gridColumn: 'span 2' }}>
+                <label style={labelStyle}>Days</label>
                 {isEditing ? (
-                  <textarea
-                    value={record.intake?.availability || ''}
-                    onChange={(e) => onChange('intake.availability', e.target.value)}
-                    rows={2}
-                    style={{ ...inputStyle, resize: 'vertical' }}
-                  />
+                  <input type="text" value={record.intake?.days || ''} onChange={(e) => onChange('intake.days', e.target.value)} style={inputStyle} />
                 ) : (
-                  <div style={readValueStyle}>
-                    {record.intake?.availability || '—'}
-                  </div>
+                  <div style={readValueStyle}>{record.intake?.days || '—'}</div>
+                )}
+              </div>
+              <div style={{ gridColumn: 'span 2' }}>
+                <label style={labelStyle}>Times</label>
+                {isEditing ? (
+                  <input type="text" value={record.intake?.times || ''} onChange={(e) => onChange('intake.times', e.target.value)} style={inputStyle} />
+                ) : (
+                  <div style={readValueStyle}>{record.intake?.times || '—'}</div>
+                )}
+              </div>
+              <div style={{ gridColumn: 'span 2' }}>
+                <label style={labelStyle}>In-Person / Tele</label>
+                {isEditing ? (
+                  <input type="text" value={record.intake?.ipTele || ''} onChange={(e) => onChange('intake.ipTele', e.target.value)} style={inputStyle} />
+                ) : (
+                  <div style={readValueStyle}>{record.intake?.ipTele || '—'}</div>
                 )}
               </div>
             </div>
@@ -600,6 +625,11 @@ export default function App() {
   const [draftInquiry, setDraftInquiry] = useState(null);
   const [saving, setSaving] = useState(false);
   const [collapsedColumns, setCollapsedColumns] = useState({});
+  const [pipelineFilters, setPipelineFilters] = useState({ insurance: [], service: [], provider: [], internOk: false });
+  const [search, setSearch] = useState({ name: '', phone: '', email: '', insurance: '', date: '' });
+  const [activeView, setActiveView] = useState({ type: 'all', value: '' });
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 25;
 
   useEffect(() => {
     async function loadIntakes() {
@@ -805,13 +835,58 @@ export default function App() {
     }
   }
 
-  const allInquiries = useMemo(() => {
-    return [...intakes].sort((a, b) => {
+  const filteredInquiries = useMemo(() => {
+    let rows = [...intakes].sort((a, b) => {
       const aTime = a.createdAt?.toMillis?.() || 0;
       const bTime = b.createdAt?.toMillis?.() || 0;
       return bTime - aTime;
     });
-  }, [intakes]);
+
+    if (search.name)
+      rows = rows.filter(r => (r.intake?.clientName || '').toLowerCase().includes(search.name.toLowerCase()));
+    if (search.phone)
+      rows = rows.filter(r => (r.intake?.phone || '').includes(search.phone));
+    if (search.email)
+      rows = rows.filter(r => (r.intake?.email || '').toLowerCase().includes(search.email.toLowerCase()));
+    if (search.insurance)
+      rows = rows.filter(r => (r.intake?.insurance || '').toLowerCase().includes(search.insurance.toLowerCase()));
+    if (search.date)
+      rows = rows.filter(r => formatDate(r.createdAt).includes(search.date));
+
+    if (activeView.value) {
+      if (activeView.type === 'status')
+        rows = rows.filter(r => (r.pipeline?.status || '') === activeView.value);
+      else if (activeView.type === 'insurance')
+        rows = rows.filter(r => (r.intake?.insurance || '') === activeView.value);
+      else if (activeView.type === 'provider')
+        rows = rows.filter(r => (r.pipeline?.assignedProvider || '') === activeView.value);
+    }
+
+    return rows;
+  }, [intakes, search, activeView]);
+
+  const allInquiries = useMemo(() => {
+    const start = (currentPage - 1) * PAGE_SIZE;
+    return filteredInquiries.slice(start, start + PAGE_SIZE);
+  }, [filteredInquiries, currentPage, PAGE_SIZE]);
+
+  const totalPages = Math.ceil(filteredInquiries.length / PAGE_SIZE);
+
+  const pipelineFilterOptions = useMemo(() => ({
+    insurance: [...new Set(intakes.map(r => r.intake?.insurance).filter(Boolean))].sort(),
+    service: [...new Set(intakes.flatMap(r => {
+      const s = r.intake?.servicesRequested;
+      if (!s) return [];
+      return Array.isArray(s) ? s : s.split(',').map(x => x.trim());
+    }).filter(Boolean))].sort(),
+    provider: [...new Set(intakes.map(r => r.pipeline?.assignedProvider).filter(Boolean))].sort(),
+  }), [intakes]);
+
+  const viewOptions = useMemo(() => ({
+    status: [...new Set(intakes.map(r => r.pipeline?.status).filter(Boolean))].sort(),
+    insurance: [...new Set(intakes.map(r => r.intake?.insurance).filter(Boolean))].sort(),
+    provider: [...new Set(intakes.map(r => r.pipeline?.assignedProvider).filter(Boolean))].sort(),
+  }), [intakes]);
 
   if (loading) {
     return <main style={{ padding: 24 }}>Loading...</main>;
@@ -919,6 +994,44 @@ export default function App() {
                 </p>
               </div>
 
+              {/* Pipeline filters */}
+              {(() => {
+                const toggleFilter = (category, value) => {
+                  setPipelineFilters(prev => ({
+                    ...prev,
+                    [category]: prev[category].includes(value)
+                      ? prev[category].filter(v => v !== value)
+                      : [...prev[category], value],
+                  }));
+                };
+                const pillStyle = (active) => ({
+                  padding: '4px 12px',
+                  borderRadius: 20,
+                  border: '1px solid',
+                  fontSize: 13,
+                  cursor: 'pointer',
+                  borderColor: active ? '#7c3aed' : '#d1d5db',
+                  background: active ? '#ede9fe' : '#fff',
+                  color: active ? '#6d28d9' : '#374151',
+                  fontWeight: active ? 600 : 400,
+                });
+                const anyActive = pipelineFilters.insurance.length || pipelineFilters.service.length || pipelineFilters.provider.length || pipelineFilters.internOk;
+                return (
+                  <div style={{ marginBottom: 20, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                    {pipelineFilterOptions.insurance.map(v => (
+                      <button key={`ins-${v}`} onClick={() => toggleFilter('insurance', v)} style={pillStyle(pipelineFilters.insurance.includes(v))}>{v}</button>
+                    ))}
+                    {pipelineFilterOptions.service.map(v => (
+                      <button key={`svc-${v}`} onClick={() => toggleFilter('service', v)} style={pillStyle(pipelineFilters.service.includes(v))}>{v}</button>
+                    ))}
+                    <button onClick={() => setPipelineFilters(prev => ({ ...prev, internOk: !prev.internOk }))} style={pillStyle(pipelineFilters.internOk)}>Intern OK</button>
+                    {anyActive ? (
+                      <button onClick={() => setPipelineFilters({ insurance: [], service: [], provider: [], internOk: false })} style={{ ...pillStyle(false), color: '#9ca3af' }}>Clear</button>
+                    ) : null}
+                  </div>
+                );
+              })()}
+
               <DragDropContext onDragEnd={handleDragEnd}>
                 <div style={{ width: '100%', overflowX: 'auto', paddingBottom: 8 }}>
                   <div
@@ -930,9 +1043,18 @@ export default function App() {
                     }}
                   >
                     {columns.map((column) => {
-                      const columnCards = intakes.filter(
-                        (intake) => intake.pipeline?.status === column.id
-                      );
+                      const columnCards = intakes.filter((intake) => {
+                        if (intake.pipeline?.status !== column.id) return false;
+                        if (pipelineFilters.insurance.length && !pipelineFilters.insurance.includes(intake.intake?.insurance)) return false;
+                        if (pipelineFilters.provider.length && !pipelineFilters.provider.includes(intake.pipeline?.assignedProvider)) return false;
+                        if (pipelineFilters.service.length) {
+                          const s = intake.intake?.servicesRequested;
+                          const services = Array.isArray(s) ? s : (s || '').split(',').map(x => x.trim());
+                          if (!pipelineFilters.service.some(f => services.includes(f))) return false;
+                        }
+                        if (pipelineFilters.internOk && (!intake.intake?.openToIntern || intake.intake.openToIntern.toLowerCase() === 'no')) return false;
+                        return true;
+                      });
                       const isCollapsed = collapsedColumns[column.id];
 
                       return (
@@ -1019,66 +1141,95 @@ export default function App() {
                                       index={index}
                                       key={card.id}
                                     >
-                                      {(providedDraggable, snapshotDraggable) => (
-                                        <div
-                                          ref={providedDraggable.innerRef}
-                                          {...providedDraggable.draggableProps}
-                                          {...providedDraggable.dragHandleProps}
-                                          onClick={() => openInquiry(card)}
-                                          style={{
-                                            background: '#fff',
-                                            borderRadius: 12,
-                                            padding: 12,
-                                            marginBottom: 10,
-                                            boxShadow: snapshotDraggable.isDragging
-                                              ? '0 8px 20px rgba(0,0,0,0.12)'
-                                              : '0 1px 3px rgba(0,0,0,0.1)',
-                                            border:
-                                              selectedInquiry?.id === card.id ||
-                                              updatingId === card.id
+                                      {(providedDraggable, snapshotDraggable) => {
+                                        const createdDate = card.createdAt?.toDate
+                                          ? card.createdAt.toDate()
+                                          : card.createdAt ? new Date(card.createdAt) : null;
+                                        const refDate = card.pipeline?.lastContactDate
+                                          ? new Date(card.pipeline.lastContactDate)
+                                          : createdDate;
+                                        const daysSinceContact = refDate
+                                          ? Math.floor((Date.now() - refDate.getTime()) / 86400000)
+                                          : null;
+                                        const isOverdue = daysSinceContact !== null && daysSinceContact >= 3;
+                                        const isSelected = selectedInquiry?.id === card.id || updatingId === card.id;
+
+                                        return (
+                                          <div
+                                            ref={providedDraggable.innerRef}
+                                            {...providedDraggable.draggableProps}
+                                            {...providedDraggable.dragHandleProps}
+                                            onClick={() => openInquiry(card)}
+                                            style={{
+                                              background: '#fff',
+                                              borderRadius: 12,
+                                              padding: 12,
+                                              marginBottom: 10,
+                                              boxShadow: snapshotDraggable.isDragging
+                                                ? '0 8px 20px rgba(0,0,0,0.12)'
+                                                : '0 1px 3px rgba(0,0,0,0.1)',
+                                              border: isSelected
                                                 ? '1px solid #7c3aed'
+                                                : isOverdue
+                                                ? '1px solid #f87171'
                                                 : '1px solid #ececec',
-                                            cursor: 'pointer',
-                                            ...providedDraggable.draggableProps.style,
-                                          }}
-                                        >
-                                          <strong>
-                                            {card.intake?.clientName || 'No name'}
-                                          </strong>
-
-                                          <div
-                                            style={{
-                                              fontSize: 12,
-                                              marginTop: 4,
-                                              color: '#6b7280',
+                                              cursor: 'pointer',
+                                              ...providedDraggable.draggableProps.style,
                                             }}
                                           >
-                                            {formatDate(card.createdAt)}
-                                          </div>
-
-                                          <div
-                                            style={{
-                                              fontSize: 13,
-                                              marginTop: 6,
-                                              color: '#555',
-                                            }}
-                                          >
-                                            Insurance: {card.intake?.insurance || '—'}
-                                          </div>
-
-                                          {card.intake?.preferredProvider ? (
-                                            <div
-                                              style={{
-                                                fontSize: 13,
-                                                marginTop: 4,
-                                                color: '#555',
-                                              }}
-                                            >
-                                              Pref. Provider: {card.intake.preferredProvider}
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 6 }}>
+                                              <strong style={{ flex: 1 }}>
+                                                {card.intake?.clientName || 'No name'}
+                                              </strong>
+                                              <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                                                {card.intake?.servicesRequested ? (
+                                                  <span style={{
+                                                    fontSize: 11,
+                                                    background: '#ede9fe',
+                                                    color: '#6d28d9',
+                                                    borderRadius: 6,
+                                                    padding: '2px 7px',
+                                                    whiteSpace: 'nowrap',
+                                                    fontWeight: 500,
+                                                  }}>
+                                                    {(Array.isArray(card.intake.servicesRequested) ? card.intake.servicesRequested[0] : card.intake.servicesRequested.split(',')[0]).trim()}
+                                                  </span>
+                                                ) : null}
+                                                {card.intake?.openToIntern && card.intake.openToIntern.toLowerCase() !== 'no' ? (
+                                                  <span style={{
+                                                    fontSize: 11,
+                                                    background: '#d1fae5',
+                                                    color: '#065f46',
+                                                    borderRadius: 6,
+                                                    padding: '2px 7px',
+                                                    whiteSpace: 'nowrap',
+                                                    fontWeight: 500,
+                                                  }}>
+                                                    Intern OK
+                                                  </span>
+                                                ) : null}
+                                              </div>
                                             </div>
-                                          ) : null}
-                                        </div>
-                                      )}
+
+                                            <div style={{ fontSize: 12, marginTop: 4, color: '#6b7280' }}>
+                                              {formatDate(card.createdAt)}
+                                              {daysSinceContact !== null && (
+                                                <span style={{
+                                                  marginLeft: 6,
+                                                  color: isOverdue ? '#ef4444' : '#9ca3af',
+                                                  fontWeight: isOverdue ? 600 : 400,
+                                                }}>
+                                                  · {daysSinceContact === 0 ? 'today' : `${daysSinceContact}d ago`}
+                                                </span>
+                                              )}
+                                            </div>
+
+                                            <div style={{ fontSize: 13, marginTop: 6, color: '#555' }}>
+                                              Insurance: {card.intake?.insurance || '—'}
+                                            </div>
+                                          </div>
+                                        );
+                                      }}
                                     </Draggable>
                                   ))}
 
@@ -1106,25 +1257,90 @@ export default function App() {
             </>
           ) : (
             <>
-              <div style={{ marginBottom: 20 }}>
+              <div style={{ marginBottom: 16, display: 'flex', alignItems: 'baseline', gap: 12 }}>
                 <h1 style={{ margin: 0, fontSize: 32 }}>All Inquiries</h1>
-                <p style={{ marginTop: 8, color: '#6b7280' }}>
-                  Review all inquiries, including archived and no-response records.
-                </p>
+                <span style={{ fontSize: 14, color: '#6b7280' }}>{filteredInquiries.length} result{filteredInquiries.length !== 1 ? 's' : ''}</span>
               </div>
 
-              <div
-                style={{
-                  background: '#fff',
-                  border: '1px solid #e5e7eb',
-                  borderRadius: 16,
-                  overflow: 'hidden',
-                }}
-              >
+              {/* Search filters */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 16 }}>
+                {[
+                  { key: 'name', placeholder: 'Client name' },
+                  { key: 'phone', placeholder: 'Phone' },
+                  { key: 'email', placeholder: 'Email' },
+                  { key: 'insurance', placeholder: 'Insurance' },
+                  { key: 'date', placeholder: 'Date (M/D/YYYY)' },
+                ].map(({ key, placeholder }) => (
+                  <input
+                    key={key}
+                    type="text"
+                    placeholder={placeholder}
+                    value={search[key]}
+                    onChange={(e) => { setSearch(s => ({ ...s, [key]: e.target.value })); setCurrentPage(1); }}
+                    style={{ padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13, width: '100%', boxSizing: 'border-box' }}
+                  />
+                ))}
+              </div>
+
+              {/* Views */}
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                  {[
+                    { label: 'All', type: 'all', value: '' },
+                    ...viewOptions.status.map(v => ({ label: v, type: 'status', value: v })),
+                  ].map(opt => (
+                    <button
+                      key={`status-${opt.value}`}
+                      onClick={() => { setActiveView({ type: opt.type, value: opt.value }); setCurrentPage(1); }}
+                      style={{
+                        padding: '4px 12px',
+                        borderRadius: 20,
+                        border: '1px solid',
+                        fontSize: 13,
+                        cursor: 'pointer',
+                        borderColor: activeView.type === opt.type && activeView.value === opt.value ? '#7c3aed' : '#d1d5db',
+                        background: activeView.type === opt.type && activeView.value === opt.value ? '#ede9fe' : '#fff',
+                        color: activeView.type === opt.type && activeView.value === opt.value ? '#6d28d9' : '#374151',
+                        fontWeight: activeView.type === opt.type && activeView.value === opt.value ? 600 : 400,
+                      }}
+                    >
+                      {opt.label}
+                      {opt.value && (
+                        <span style={{ marginLeft: 5, fontSize: 11, color: '#9ca3af' }}>
+                          {intakes.filter(r => r.pipeline?.status === opt.value).length}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+
+                  <span style={{ margin: '0 4px', color: '#d1d5db' }}>|</span>
+
+                  <select
+                    value={activeView.type === 'insurance' ? activeView.value : ''}
+                    onChange={(e) => { setActiveView(e.target.value ? { type: 'insurance', value: e.target.value } : { type: 'all', value: '' }); setCurrentPage(1); }}
+                    style={{ padding: '4px 10px', borderRadius: 20, border: '1px solid', borderColor: activeView.type === 'insurance' ? '#7c3aed' : '#d1d5db', fontSize: 13, cursor: 'pointer', background: activeView.type === 'insurance' ? '#ede9fe' : '#fff', color: activeView.type === 'insurance' ? '#6d28d9' : '#374151' }}
+                  >
+                    <option value="">Insurance</option>
+                    {viewOptions.insurance.map(v => <option key={v} value={v}>{v} ({intakes.filter(r => r.intake?.insurance === v).length})</option>)}
+                  </select>
+
+                  <select
+                    value={activeView.type === 'provider' ? activeView.value : ''}
+                    onChange={(e) => { setActiveView(e.target.value ? { type: 'provider', value: e.target.value } : { type: 'all', value: '' }); setCurrentPage(1); }}
+                    style={{ padding: '4px 10px', borderRadius: 20, border: '1px solid', borderColor: activeView.type === 'provider' ? '#7c3aed' : '#d1d5db', fontSize: 13, cursor: 'pointer', background: activeView.type === 'provider' ? '#ede9fe' : '#fff', color: activeView.type === 'provider' ? '#6d28d9' : '#374151' }}
+                  >
+                    <option value="">Assigned Provider</option>
+                    {viewOptions.provider.map(v => <option key={v} value={v}>{v} ({intakes.filter(r => r.pipeline?.assignedProvider === v).length})</option>)}
+                  </select>
+                </div>
+              </div>
+
+              {/* Table */}
+              <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 16, overflow: 'hidden' }}>
                 <div
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: '2fr 1.2fr 1.2fr 1.2fr 1fr',
+                    gridTemplateColumns: '1.2fr 1fr 2fr 1fr 1.2fr 1.4fr',
                     gap: 12,
                     padding: '14px 16px',
                     background: '#f9fafb',
@@ -1134,11 +1350,12 @@ export default function App() {
                     color: '#374151',
                   }}
                 >
-                  <div>Name</div>
-                  <div>Insurance</div>
+                  <div>Date of Inquiry</div>
                   <div>Status</div>
-                  <div>Created</div>
-                  <div>Contacts</div>
+                  <div>Name</div>
+                  <div>DOB</div>
+                  <div>Insurance</div>
+                  <div>Assigned Provider</div>
                 </div>
 
                 {allInquiries.map((item) => (
@@ -1147,7 +1364,7 @@ export default function App() {
                     onClick={() => openInquiry(item)}
                     style={{
                       display: 'grid',
-                      gridTemplateColumns: '2fr 1.2fr 1.2fr 1.2fr 1fr',
+                      gridTemplateColumns: '1.2fr 1fr 2fr 1fr 1.2fr 1.4fr',
                       gap: 12,
                       padding: '14px 16px',
                       borderBottom: '1px solid #f1f5f9',
@@ -1157,20 +1374,40 @@ export default function App() {
                       background: selectedInquiry?.id === item.id ? '#faf5ff' : '#fff',
                     }}
                   >
-                    <div>{item.intake?.clientName || '—'}</div>
-                    <div>{item.intake?.insurance || '—'}</div>
-                    <div>{item.pipeline?.status || '—'}</div>
                     <div>{formatDate(item.createdAt)}</div>
-                    <div>{item.pipeline?.contactAttempts ?? 0}</div>
+                    <div>{item.pipeline?.status || '—'}</div>
+                    <div>{item.intake?.clientName || '—'}</div>
+                    <div>{formatDate(item.intake?.dob)}</div>
+                    <div>{item.intake?.insurance || '—'}</div>
+                    <div>{item.pipeline?.assignedProvider || '—'}</div>
                   </div>
                 ))}
 
-                {allInquiries.length === 0 ? (
-                  <div style={{ padding: 20, color: '#6b7280' }}>
-                    No inquiries found.
-                  </div>
-                ) : null}
+                {allInquiries.length === 0 && (
+                  <div style={{ padding: 20, color: '#6b7280' }}>No inquiries found.</div>
+                )}
               </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 8, marginTop: 16 }}>
+                  <button
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', cursor: currentPage === 1 ? 'default' : 'pointer', color: currentPage === 1 ? '#9ca3af' : '#374151' }}
+                  >
+                    ← Prev
+                  </button>
+                  <span style={{ fontSize: 13, color: '#6b7280' }}>Page {currentPage} of {totalPages}</span>
+                  <button
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', cursor: currentPage === totalPages ? 'default' : 'pointer', color: currentPage === totalPages ? '#9ca3af' : '#374151' }}
+                  >
+                    Next →
+                  </button>
+                </div>
+              )}
             </>
           )}
         </main>

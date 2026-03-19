@@ -67,9 +67,13 @@ export const jotformWebhook = onRequest(async (req, res) => {
       ? raw.q10_whatType.join(", ")
       : raw.q10_whatType || "";
 
-    const problems = Array.isArray(raw.q35_promptedYou)
+    const promptedYou = Array.isArray(raw.q35_promptedYou)
       ? raw.q35_promptedYou.join(", ")
       : raw.q35_promptedYou || "";
+
+    const problemChecklist = Array.isArray(raw.q34_whatProblems)
+      ? raw.q34_whatProblems.join(", ")
+      : raw.q34_whatProblems || "";
 
     const days = Array.isArray(raw.q41_daysAvailable)
       ? raw.q41_daysAvailable.join(", ")
@@ -113,7 +117,8 @@ export const jotformWebhook = onRequest(async (req, res) => {
         parentFirstName: raw.q15_parentguardianName?.first || "",
         parentLastName: raw.q15_parentguardianName?.last || "",
         tags: "",
-        problems,
+        promptedYou,
+        problemChecklist,
         previousTherapy: raw.q36_haveYou || "",
         previousMeds: raw.q38_haveYou38 || "",
         safety: raw.q39_haveYou39 || "",
