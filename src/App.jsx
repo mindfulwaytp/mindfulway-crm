@@ -10,7 +10,6 @@ import {
   createInquiry,
 } from './lib/inquiriesApi';
 
-
 const columns = [
   { id: 'new', title: 'New', color: '#dbeafe', border: '#93c5fd' },
   { id: 'contact1', title: 'Contact 1', color: '#fef3c7', border: '#fcd34d' },
@@ -288,13 +287,7 @@ function DetailPanel({
               Pipeline
             </h3>
 
-            <div
-              style={{
-                display: 'grid',
-                gap: 12,
-                fontSize: 14,
-              }}
-            >
+            <div style={{ display: 'grid', gap: 12, fontSize: 14 }}>
               <div>
                 <label style={labelStyle}>Status</label>
                 {isEditing ? (
@@ -321,9 +314,7 @@ function DetailPanel({
                   <input
                     type="text"
                     value={record.pipeline?.assignedProvider || ''}
-                    onChange={(e) =>
-                      onChange('pipeline.assignedProvider', e.target.value)
-                    }
+                    onChange={(e) => onChange('pipeline.assignedProvider', e.target.value)}
                     style={inputStyle}
                   />
                 ) : (
@@ -341,10 +332,7 @@ function DetailPanel({
                     min="0"
                     value={record.pipeline?.contactAttempts ?? 0}
                     onChange={(e) =>
-                      onChange(
-                        'pipeline.contactAttempts',
-                        Number(e.target.value) || 0
-                      )
+                      onChange('pipeline.contactAttempts', Number(e.target.value) || 0)
                     }
                     style={inputStyle}
                   />
@@ -361,9 +349,7 @@ function DetailPanel({
                   <input
                     type="text"
                     value={record.pipeline?.lastContactDate || ''}
-                    onChange={(e) =>
-                      onChange('pipeline.lastContactDate', e.target.value)
-                    }
+                    onChange={(e) => onChange('pipeline.lastContactDate', e.target.value)}
                     placeholder="MM/DD/YYYY or leave blank"
                     style={inputStyle}
                   />
@@ -389,7 +375,6 @@ function DetailPanel({
                   </div>
                 )}
               </div>
-
             </div>
           </div>
 
@@ -506,9 +491,7 @@ function DetailPanel({
                   <input
                     type="text"
                     value={record.intake?.preferredProvider || ''}
-                    onChange={(e) =>
-                      onChange('intake.preferredProvider', e.target.value)
-                    }
+                    onChange={(e) => onChange('intake.preferredProvider', e.target.value)}
                     style={inputStyle}
                   />
                 ) : (
@@ -524,9 +507,7 @@ function DetailPanel({
                   <input
                     type="text"
                     value={record.intake?.servicesRequested || ''}
-                    onChange={(e) =>
-                      onChange('intake.servicesRequested', e.target.value)
-                    }
+                    onChange={(e) => onChange('intake.servicesRequested', e.target.value)}
                     style={inputStyle}
                   />
                 ) : (
@@ -608,7 +589,6 @@ function DetailPanel({
   );
 }
 
-
 export default function App() {
   const [intakes, setIntakes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -621,28 +601,23 @@ export default function App() {
   const [saving, setSaving] = useState(false);
   const [collapsedColumns, setCollapsedColumns] = useState({});
 
-  
   useEffect(() => {
-  async function loadIntakes() {
-    try {
-      const rows = await fetchInquiries();
-      setIntakes(rows);
-    } catch (err) {
-      setError(err.message || 'Failed to load intakes');
-    } finally {
-      setLoading(false);
+    async function loadIntakes() {
+      try {
+        const rows = await fetchInquiries();
+        setIntakes(rows);
+      } catch (err) {
+        setError(err.message || 'Failed to load intakes');
+      } finally {
+        setLoading(false);
+      }
     }
-  }
 
-  loadIntakes();
+    loadIntakes();
 
-  // 🔄 refresh every 10 seconds
-  const interval = setInterval(loadIntakes, 10000);
-
-  return () => clearInterval(interval);
-}, []);
-
-
+    const interval = setInterval(loadIntakes, 10000);
+    return () => clearInterval(interval);
+  }, []);
 
   function openInquiry(inquiry) {
     setSelectedInquiry(inquiry);
@@ -668,12 +643,12 @@ export default function App() {
     setIsEditing(false);
   }
 
-    function toggleColumn(columnId) {
-      setCollapsedColumns((prev) => ({
-        ...prev,
-        [columnId]: !prev[columnId],
-      }));
-    }
+  function toggleColumn(columnId) {
+    setCollapsedColumns((prev) => ({
+      ...prev,
+      [columnId]: !prev[columnId],
+    }));
+  }
 
   function updateDraft(path, value) {
     setDraftInquiry((prev) => {
@@ -696,151 +671,139 @@ export default function App() {
     });
   }
 
-
   async function testFirestoreWrite() {
-  setError('');
+    setError('');
 
-  try {
-    const id = await createInquiry({
-      source: 'manual-test',
-      intake: {
-        clientName: 'Test Client',
-        preferredName: '',
-        email: 'test@example.com',
-        phone: '555-555-5555',
-        insurance: 'Premera',
-        servicesRequested: ['therapy'],
-        preferredProvider: '',
-        dob: '',
-        problems: 'Firestore test',
-        safety: '',
-        availability: 'Afternoons',
-      },
-      pipeline: {
-        status: 'new',
-        assignedProvider: '',
-        lastContactDate: null,
-        nextStep: '',
-        contactAttempts: 0,
-        archived: false,
-      },
-    });
+    try {
+      const id = await createInquiry({
+        source: 'manual-test',
+        intake: {
+          clientName: 'Test Client',
+          preferredName: '',
+          email: 'test@example.com',
+          phone: '555-555-5555',
+          insurance: 'Premera',
+          servicesRequested: ['therapy'],
+          preferredProvider: '',
+          dob: '',
+          problems: 'Firestore test',
+          safety: '',
+          availability: 'Afternoons',
+        },
+        pipeline: {
+          status: 'new',
+          assignedProvider: '',
+          lastContactDate: null,
+          nextStep: '',
+          contactAttempts: 0,
+          archived: false,
+        },
+      });
 
-    console.log('Created inquiry:', id);
+      console.log('Created inquiry:', id);
 
-    const rows = await fetchInquiries();
-    setIntakes(rows);
-  } catch (err) {
-    setError(err.message || 'Failed to write test inquiry');
+      const rows = await fetchInquiries();
+      setIntakes(rows);
+    } catch (err) {
+      setError(err.message || 'Failed to write test inquiry');
+    }
   }
-}
+
   async function handleSaveEdit() {
-  if (!selectedInquiry || !draftInquiry) return;
+    if (!selectedInquiry || !draftInquiry) return;
 
-  setSaving(true);
-  setError('');
+    setSaving(true);
+    setError('');
 
-  try {
-    const updatedRecord = cloneData(draftInquiry);
+    try {
+      const updatedRecord = cloneData(draftInquiry);
 
-    const changes = {
-      'intake.clientName': updatedRecord.intake?.clientName || '',
-      'intake.preferredName': updatedRecord.intake?.preferredName || '',
-      'intake.insurance': updatedRecord.intake?.insurance || '',
-      'intake.phone': updatedRecord.intake?.phone || '',
-      'intake.email': updatedRecord.intake?.email || '',
-      'intake.preferredProvider': updatedRecord.intake?.preferredProvider || '',
-      'intake.servicesRequested': updatedRecord.intake?.servicesRequested || '',
-      'intake.dob': updatedRecord.intake?.dob || '',
-      'intake.problems': updatedRecord.intake?.problems || '',
-      'intake.safety': updatedRecord.intake?.safety || '',
-      'intake.availability': updatedRecord.intake?.availability || '',
-      'pipeline.status': updatedRecord.pipeline?.status || 'new',
-      'pipeline.assignedProvider': updatedRecord.pipeline?.assignedProvider || '',
-      'pipeline.contactAttempts': updatedRecord.pipeline?.contactAttempts ?? 0,
-      'pipeline.lastContactDate': updatedRecord.pipeline?.lastContactDate || '',
-      'pipeline.nextStep': updatedRecord.pipeline?.nextStep || '',
-    };
+      const changes = {
+        'intake.clientName': updatedRecord.intake?.clientName || '',
+        'intake.preferredName': updatedRecord.intake?.preferredName || '',
+        'intake.insurance': updatedRecord.intake?.insurance || '',
+        'intake.phone': updatedRecord.intake?.phone || '',
+        'intake.email': updatedRecord.intake?.email || '',
+        'intake.preferredProvider': updatedRecord.intake?.preferredProvider || '',
+        'intake.servicesRequested': updatedRecord.intake?.servicesRequested || '',
+        'intake.dob': updatedRecord.intake?.dob || '',
+        'intake.problems': updatedRecord.intake?.problems || '',
+        'intake.safety': updatedRecord.intake?.safety || '',
+        'intake.availability': updatedRecord.intake?.availability || '',
+        'pipeline.status': updatedRecord.pipeline?.status || 'new',
+        'pipeline.assignedProvider': updatedRecord.pipeline?.assignedProvider || '',
+        'pipeline.contactAttempts': updatedRecord.pipeline?.contactAttempts ?? 0,
+        'pipeline.lastContactDate': updatedRecord.pipeline?.lastContactDate || '',
+        'pipeline.nextStep': updatedRecord.pipeline?.nextStep || '',
+      };
 
-    await updateInquiryApi(selectedInquiry.id, changes);
+      await updateInquiryApi(selectedInquiry.id, changes);
 
-    setIntakes((prev) =>
-      prev.map((item) =>
-        item.id === selectedInquiry.id ? updatedRecord : item
-      )
-    );
+      setIntakes((prev) =>
+        prev.map((item) => (item.id === selectedInquiry.id ? updatedRecord : item))
+      );
 
-    setSelectedInquiry(updatedRecord);
-    setDraftInquiry(cloneData(updatedRecord));
-    setIsEditing(false);
-  } catch (err) {
-    setError(err.message || 'Failed to save inquiry');
-  } finally {
-    setSaving(false);
+      setSelectedInquiry(updatedRecord);
+      setDraftInquiry(cloneData(updatedRecord));
+      setIsEditing(false);
+    } catch (err) {
+      setError(err.message || 'Failed to save inquiry');
+    } finally {
+      setSaving(false);
+    }
   }
-}
-  
 
   async function handleDragEnd(result) {
-  const { destination, source, draggableId } = result;
+    const { destination, source, draggableId } = result;
 
-  if (!destination) return;
+    if (!destination) return;
 
-  if (
-    destination.droppableId === source.droppableId &&
-    destination.index === source.index
-  ) {
-    return;
-  }
-
-  const previousIntakes = intakes;
-  const newStatus = destination.droppableId;
-
-  const updatedIntakes = intakes.map((item) =>
-    item.id === draggableId
-      ? {
-          ...item,
-          pipeline: {
-            ...item.pipeline,
-            status: newStatus,
-          },
-        }
-      : item
-  );
-
-  setIntakes(updatedIntakes);
-  setUpdatingId(draggableId);
-
-  if (selectedInquiry?.id === draggableId) {
-    const updatedSelected = updatedIntakes.find((item) => item.id === draggableId);
-    setSelectedInquiry(updatedSelected || null);
-
-    if (isEditing && draftInquiry?.id === draggableId) {
-      setDraftInquiry(cloneData(updatedSelected));
+    if (
+      destination.droppableId === source.droppableId &&
+      destination.index === source.index
+    ) {
+      return;
     }
-  }
 
-  try {
-    await updateInquiryApi(draggableId, {
-      'pipeline.status': newStatus,
-    });
-  } catch (err) {
-    setIntakes(previousIntakes);
-    setError(err.message || 'Failed to update status');
+    const previousIntakes = intakes;
+    const newStatus = destination.droppableId;
+
+    const updatedIntakes = intakes.map((item) =>
+      item.id === draggableId
+        ? { ...item, pipeline: { ...item.pipeline, status: newStatus } }
+        : item
+    );
+
+    setIntakes(updatedIntakes);
+    setUpdatingId(draggableId);
 
     if (selectedInquiry?.id === draggableId) {
-      const previousSelected = previousIntakes.find((item) => item.id === draggableId);
-      setSelectedInquiry(previousSelected || null);
+      const updatedSelected = updatedIntakes.find((item) => item.id === draggableId);
+      setSelectedInquiry(updatedSelected || null);
 
-      if (isEditing && previousSelected) {
-        setDraftInquiry(cloneData(previousSelected));
+      if (isEditing && draftInquiry?.id === draggableId) {
+        setDraftInquiry(cloneData(updatedSelected));
       }
     }
-  } finally {
-    setUpdatingId('');
-  }
-}
 
+    try {
+      await updateInquiryApi(draggableId, { 'pipeline.status': newStatus });
+    } catch (err) {
+      setIntakes(previousIntakes);
+      setError(err.message || 'Failed to update status');
+
+      if (selectedInquiry?.id === draggableId) {
+        const previousSelected = previousIntakes.find((item) => item.id === draggableId);
+        setSelectedInquiry(previousSelected || null);
+
+        if (isEditing && previousSelected) {
+          setDraftInquiry(cloneData(previousSelected));
+        }
+      }
+    } finally {
+      setUpdatingId('');
+    }
+  }
 
   const allInquiries = useMemo(() => {
     return [...intakes].sort((a, b) => {
@@ -871,89 +834,67 @@ export default function App() {
         }}
       >
         <div style={{ marginBottom: 32 }}>
-          <h2
-            style={{
-              margin: 0,
-              fontSize: 22,
-              fontWeight: 700,
-            }}
-          >
+          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>
             Mindful Way CRM
           </h2>
-          <p
-            style={{
-              marginTop: 6,
-              fontSize: 13,
-              color: '#6b7280',
-            }}
-          >
+          <p style={{ marginTop: 6, fontSize: 13, color: '#6b7280' }}>
             Intake pipeline
           </p>
         </div>
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-  <button
-    onClick={() => setView('active')}
-    style={{
-      textAlign: 'left',
-      padding: '12px 14px',
-      borderRadius: 10,
-      border: '1px solid',
-      borderColor: view === 'active' ? '#c4b5fd' : '#e5e7eb',
-      background: view === 'active' ? '#f5f3ff' : '#fff',
-      fontWeight: 600,
-      cursor: 'pointer',
-    }}
-  >
-    Active
-  </button>
+          <button
+            onClick={() => setView('active')}
+            style={{
+              textAlign: 'left',
+              padding: '12px 14px',
+              borderRadius: 10,
+              border: '1px solid',
+              borderColor: view === 'active' ? '#c4b5fd' : '#e5e7eb',
+              background: view === 'active' ? '#f5f3ff' : '#fff',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Active
+          </button>
 
-  <button
-    onClick={() => setView('all')}
-    style={{
-      textAlign: 'left',
-      padding: '12px 14px',
-      borderRadius: 10,
-      border: '1px solid',
-      borderColor: view === 'all' ? '#c4b5fd' : '#e5e7eb',
-      background: view === 'all' ? '#f5f3ff' : '#fff',
-      fontWeight: 600,
-      cursor: 'pointer',
-    }}
-  >
-    All Inquiries
-  </button>
+          <button
+            onClick={() => setView('all')}
+            style={{
+              textAlign: 'left',
+              padding: '12px 14px',
+              borderRadius: 10,
+              border: '1px solid',
+              borderColor: view === 'all' ? '#c4b5fd' : '#e5e7eb',
+              background: view === 'all' ? '#f5f3ff' : '#fff',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            All Inquiries
+          </button>
 
-  <button
-    onClick={testFirestoreWrite}
-    style={{
-      textAlign: 'left',
-      padding: '12px 14px',
-      borderRadius: 10,
-      border: '1px solid #d1d5db',
-      background: '#fff',
-      fontWeight: 600,
-      cursor: 'pointer',
-      marginTop: 12,
-    }}
-  >
-    Test Firestore
-  </button>
-</nav>
+          <button
+            onClick={testFirestoreWrite}
+            style={{
+              textAlign: 'left',
+              padding: '12px 14px',
+              borderRadius: 10,
+              border: '1px solid #d1d5db',
+              background: '#fff',
+              fontWeight: 600,
+              cursor: 'pointer',
+              marginTop: 12,
+            }}
+          >
+            Test Firestore
+          </button>
+        </nav>
       </aside>
 
-      <div
-        style={{
-          minWidth: 0,
-        }}
-      >
-        <main
-          style={{
-            padding: 32,
-            overflow: 'hidden',
-            minWidth: 0,
-          }}
-        >
+      <div style={{ minWidth: 0 }}>
+        <main style={{ padding: 32, overflow: 'hidden', minWidth: 0 }}>
           {error ? (
             <div
               style={{
@@ -979,13 +920,7 @@ export default function App() {
               </div>
 
               <DragDropContext onDragEnd={handleDragEnd}>
-                <div
-                  style={{
-                    width: '100%',
-                    overflowX: 'auto',
-                    paddingBottom: 8,
-                  }}
-                >
+                <div style={{ width: '100%', overflowX: 'auto', paddingBottom: 8 }}>
                   <div
                     style={{
                       display: 'flex',
@@ -998,12 +933,10 @@ export default function App() {
                       const columnCards = intakes.filter(
                         (intake) => intake.pipeline?.status === column.id
                       );
-
                       const isCollapsed = collapsedColumns[column.id];
 
                       return (
                         <Droppable droppableId={column.id} key={column.id}>
-
                           {(provided, snapshot) => (
                             <div
                               ref={provided.innerRef}
@@ -1021,63 +954,62 @@ export default function App() {
                               }}
                             >
                               <div
-                              style={{
-                                background: column.color,
-                                padding: '12px 14px',
-                                borderBottom: `1px solid ${column.border}`,
-                                display: 'flex',
-                                justifyContent: 'space-between',
-                                alignItems: 'center',
-                                gap: 8,
-                              }}
-                            >
-                              <div style={{ minWidth: 0, flex: 1 }}>
-                                <h3
-                                  style={{
-                                    margin: 0,
-                                    fontSize: 16,
-                                    fontWeight: 600,
-                                    whiteSpace: 'nowrap',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                  }}
-                                >
-                                  {column.title}
-                                </h3>
+                                style={{
+                                  background: column.color,
+                                  padding: '12px 14px',
+                                  borderBottom: `1px solid ${column.border}`,
+                                  display: 'flex',
+                                  justifyContent: 'space-between',
+                                  alignItems: 'center',
+                                  gap: 8,
+                                }}
+                              >
+                                <div style={{ minWidth: 0, flex: 1 }}>
+                                  <h3
+                                    style={{
+                                      margin: 0,
+                                      fontSize: 16,
+                                      fontWeight: 600,
+                                      whiteSpace: 'nowrap',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                    }}
+                                  >
+                                    {column.title}
+                                  </h3>
+                                </div>
+
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                  <span
+                                    style={{
+                                      fontSize: 12,
+                                      fontWeight: 600,
+                                      background: '#fff',
+                                      border: `1px solid ${column.border}`,
+                                      borderRadius: 999,
+                                      padding: '2px 8px',
+                                    }}
+                                  >
+                                    {columnCards.length}
+                                  </span>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleColumn(column.id)}
+                                    style={{
+                                      border: `1px solid ${column.border}`,
+                                      background: '#fff',
+                                      borderRadius: 8,
+                                      padding: '4px 8px',
+                                      cursor: 'pointer',
+                                      fontSize: 12,
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    {isCollapsed ? 'Show' : 'Hide'}
+                                  </button>
+                                </div>
                               </div>
-
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <span
-                              style={{
-                                fontSize: 12,
-                                fontWeight: 600,
-                                background: '#fff',
-                                border: `1px solid ${column.border}`,
-                                borderRadius: 999,
-                                padding: '2px 8px',
-                              }}
-                            >
-                              {columnCards.length}
-                            </span>
-
-                            <button
-                              type="button"
-                              onClick={() => toggleColumn(column.id)}
-                              style={{
-                                border: `1px solid ${column.border}`,
-                                background: '#fff',
-                                borderRadius: 8,
-                                padding: '4px 8px',
-                                cursor: 'pointer',
-                                fontSize: 12,
-                                fontWeight: 600,
-                              }}
-                            >
-                              {isCollapsed ? 'Show' : 'Hide'}
-                            </button>
-                          </div>
-                        </div>
-
 
                               {!isCollapsed ? (
                                 <div style={{ padding: 12 }}>
@@ -1102,9 +1034,8 @@ export default function App() {
                                               ? '0 8px 20px rgba(0,0,0,0.12)'
                                               : '0 1px 3px rgba(0,0,0,0.1)',
                                             border:
-                                              selectedInquiry?.id === card.id
-                                                ? '1px solid #7c3aed'
-                                                : updatingId === card.id
+                                              selectedInquiry?.id === card.id ||
+                                              updatingId === card.id
                                                 ? '1px solid #7c3aed'
                                                 : '1px solid #ececec',
                                             cursor: 'pointer',
@@ -1154,13 +1085,7 @@ export default function App() {
                                   {provided.placeholder}
 
                                   {columnCards.length === 0 ? (
-                                    <p
-                                      style={{
-                                        fontSize: 13,
-                                        color: '#666',
-                                        marginTop: 8,
-                                      }}
-                                    >
+                                    <p style={{ fontSize: 13, color: '#666', marginTop: 8 }}>
                                       No records
                                     </p>
                                   ) : null}
@@ -1170,8 +1095,6 @@ export default function App() {
                                   {provided.placeholder}
                                 </div>
                               )}
-
-
                             </div>
                           )}
                         </Droppable>
@@ -1265,7 +1188,6 @@ export default function App() {
             saving={saving}
           />
         ) : null}
-
       </div>
     </div>
   );
