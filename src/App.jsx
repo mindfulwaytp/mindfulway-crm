@@ -310,6 +310,8 @@ function DetailPanel({
                     <option value="scheduled">Scheduled</option>
                     <option value="waitlist">Waitlist</option>
                     <option value="archived">Archived</option>
+                    <option value="became client">Became Client</option>
+                    <option value="declined">Declined</option>
                   </select>
                 ) : (
                   <div style={readValueStyle}>{record.pipeline?.status || '—'}</div>
