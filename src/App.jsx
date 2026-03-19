@@ -535,7 +535,7 @@ function DetailPanel({
               </div>
 
               <div style={{ gridColumn: '1 / -1' }}>
-                <label style={labelStyle}>Problems</label>
+                <label style={labelStyle}>What Brought You to Therapy</label>
                 {isEditing ? (
                   <textarea
                     value={record.intake?.problems || ''}
