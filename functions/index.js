@@ -67,9 +67,9 @@ export const jotformWebhook = onRequest(async (req, res) => {
       ? raw.q10_whatType.join(", ")
       : raw.q10_whatType || "";
 
-    const problems = Array.isArray(raw.q35_whatHas)
-      ? raw.q35_whatHas.join(", ")
-      : raw.q35_whatHas || "";
+    const problems = Array.isArray(raw.q35_promptedYou)
+      ? raw.q35_promptedYou.join(", ")
+      : raw.q35_promptedYou || "";
 
     const days = Array.isArray(raw.q41_daysAvailable)
       ? raw.q41_daysAvailable.join(", ")
