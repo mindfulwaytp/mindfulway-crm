@@ -155,8 +155,10 @@ export const jotformWebhook = onRequest(async (req, res) => {
 
 function matchProvider(raw) {
   if (!raw) return "";
-  const lower = raw.toLowerCase();
-  const match = PROVIDERS.find(p => lower.includes(p.split(",")[0].toLowerCase()));
+  // Strip parenthetical suffixes like " (Intern)" before matching
+  const cleaned = raw.replace(/\s*\(.*?\)/g, "").trim();
+  const lower = cleaned.toLowerCase();
+  const match = PROVIDERS.find(p => lower.includes(p.toLowerCase()));
   return match || raw;
 }
 

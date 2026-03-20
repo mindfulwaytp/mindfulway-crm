@@ -26,6 +26,14 @@ function formatPhone(value) {
   return `(${digits.slice(0, 3)})-${digits.slice(3, 6)}-${digits.slice(6)}`;
 }
 
+function normalizeInternValue(v) {
+  const lower = (v || '').toLowerCase();
+  if (lower === 'yes') return 'yes';
+  if (lower.includes('discuss')) return 'would like to discuss';
+  if (lower === 'no') return 'no';
+  return '';
+}
+
 function formatDate(value) {
   if (!value) return '—';
 
@@ -45,7 +53,7 @@ function cloneData(data) {
 function ProviderSelect({ value, onChange, inputStyle }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
-  const selected = value ? value.split(',').map(s => s.trim()).filter(Boolean) : [];
+  const selected = value ? value.split(',').map(s => s.replace(/\s*\(.*?\)/g, '').trim()).filter(Boolean) : [];
 
   useEffect(() => {
     function handleClickOutside(e) {
@@ -310,10 +318,10 @@ function NewEntryModal({ onClose, onCreated }) {
               </div>
               <div style={{ gridColumn: 'span 3' }}>
                 <label style={labelStyle}>Open to Intern</label>
-                <select value={draft.intake.openToIntern} onChange={(e) => update('intake.openToIntern', e.target.value)} style={inputStyle}>
+                <select value={normalizeInternValue(draft.intake.openToIntern)} onChange={(e) => update('intake.openToIntern', e.target.value)} style={inputStyle}>
                   <option value="">—</option>
                   <option value="yes">Yes</option>
-                  <option value="Would like to discuss:">Would like to discuss</option>
+                  <option value="would like to discuss">Would like to discuss</option>
                   <option value="no">No</option>
                 </select>
               </div>
@@ -645,14 +653,8 @@ function DetailPanel({
           </div>
         </div>
 
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: 'minmax(280px, 340px) minmax(0, 1fr)',
-            gap: 16,
-            alignItems: 'start',
-          }}
-        >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Pipeline — full width */}
           <div
             style={{
               border: '1px solid #e5e7eb',
@@ -661,34 +663,13 @@ function DetailPanel({
               background: '#fcfcfd',
             }}
           >
-            <h3
-              style={{
-                marginTop: 0,
-                marginBottom: 14,
-                fontSize: 17,
-                fontWeight: 700,
-              }}
-            >
-              Pipeline
-            </h3>
+            <h3 style={{ marginTop: 0, marginBottom: 14, fontSize: 17, fontWeight: 700 }}>Pipeline</h3>
 
-            <div
-              style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-                gap: 14,
-                fontSize: 14,
-              }}
-            >
-              {/* Status — spans both columns */}
-              <div style={{ gridColumn: '1 / -1' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 14, fontSize: 14, marginBottom: 14 }}>
+              <div>
                 <label style={labelStyle}>Status</label>
                 {isEditing ? (
-                  <select
-                    value={record.pipeline?.status || 'new'}
-                    onChange={(e) => onChange('pipeline.status', e.target.value)}
-                    style={inputStyle}
-                  >
+                  <select value={record.pipeline?.status || 'new'} onChange={(e) => onChange('pipeline.status', e.target.value)} style={inputStyle}>
                     <option value="new">New</option>
                     <option value="contact1">Contact 1</option>
                     <option value="contact2">Contact 2</option>
@@ -703,88 +684,54 @@ function DetailPanel({
                   <div style={readValueStyle}>{record.pipeline?.status || '—'}</div>
                 )}
               </div>
+              <div>
+                <label style={labelStyle}>Contact Attempts</label>
+                {isEditing ? (
+                  <input type="number" min="0" value={record.pipeline?.contactAttempts ?? 0} onChange={(e) => onChange('pipeline.contactAttempts', Number(e.target.value) || 0)} style={inputStyle} />
+                ) : (
+                  <div style={readValueStyle}>{record.pipeline?.contactAttempts ?? 0}</div>
+                )}
+              </div>
+              <div>
+                <label style={labelStyle}>Last Contact</label>
+                {isEditing ? (
+                  <input type="date" value={record.pipeline?.lastContactDate || ''} onChange={(e) => onChange('pipeline.lastContactDate', e.target.value)} style={inputStyle} />
+                ) : (
+                  <div style={readValueStyle}>{formatDate(record.pipeline?.lastContactDate)}</div>
+                )}
+              </div>
+            </div>
 
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 14, fontSize: 14, marginBottom: 14 }}>
               <div>
                 <label style={labelStyle}>Assigned Provider</label>
                 {isEditing ? (
                   <ProviderSelect value={record.pipeline?.assignedProvider || ''} onChange={v => onChange('pipeline.assignedProvider', v)} inputStyle={inputStyle} />
                 ) : (
-                  <div style={readValueStyle}>
-                    {record.pipeline?.assignedProvider || '—'}
-                  </div>
+                  <div style={readValueStyle}>{record.pipeline?.assignedProvider || '—'}</div>
                 )}
               </div>
-
               <div>
                 <label style={labelStyle}>Possible Providers</label>
                 {isEditing ? (
                   <ProviderSelect value={record.pipeline?.possibleProviders || ''} onChange={v => onChange('pipeline.possibleProviders', v)} inputStyle={inputStyle} />
                 ) : (
-                  <div style={readValueStyle}>
-                    {record.pipeline?.possibleProviders || '—'}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label style={labelStyle}>Contact Attempts</label>
-                {isEditing ? (
-                  <input
-                    type="number"
-                    min="0"
-                    value={record.pipeline?.contactAttempts ?? 0}
-                    onChange={(e) =>
-                      onChange('pipeline.contactAttempts', Number(e.target.value) || 0)
-                    }
-                    style={inputStyle}
-                  />
-                ) : (
-                  <div style={readValueStyle}>
-                    {record.pipeline?.contactAttempts ?? 0}
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <label style={labelStyle}>Last Contact</label>
-                {isEditing ? (
-                  <input
-                    type="date"
-                    value={record.pipeline?.lastContactDate || ''}
-                    onChange={(e) => onChange('pipeline.lastContactDate', e.target.value)}
-                    style={inputStyle}
-                  />
-                ) : (
-                  <div style={readValueStyle}>
-                    {formatDate(record.pipeline?.lastContactDate)}
-                  </div>
-                )}
-              </div>
-
-              {/* Comments — spans both columns */}
-              <div style={{ gridColumn: '1 / -1' }}>
-                <label style={labelStyle}>Comments</label>
-                {isEditing ? (
-                  <textarea
-                    value={record.pipeline?.comments || ''}
-                    onChange={(e) => onChange('pipeline.comments', e.target.value)}
-                    placeholder="Add notes or comments..."
-                    style={{
-                      ...inputStyle,
-                      minHeight: 80,
-                      resize: 'vertical',
-                      fontFamily: 'inherit',
-                    }}
-                  />
-                ) : (
-                  <div style={readValueStyle}>
-                    {record.pipeline?.comments || '—'}
-                  </div>
+                  <div style={readValueStyle}>{record.pipeline?.possibleProviders || '—'}</div>
                 )}
               </div>
             </div>
+
+            <div style={{ fontSize: 14 }}>
+              <label style={labelStyle}>Comments</label>
+              {isEditing ? (
+                <textarea value={record.pipeline?.comments || ''} onChange={(e) => onChange('pipeline.comments', e.target.value)} placeholder="Add notes or comments..." style={{ ...inputStyle, minHeight: 80, resize: 'vertical', fontFamily: 'inherit' }} />
+              ) : (
+                <div style={readValueStyle}>{record.pipeline?.comments || '—'}</div>
+              )}
+            </div>
           </div>
 
+          {/* Intake Details — full width */}
           <div
             style={{
               border: '1px solid #e5e7eb',
@@ -878,10 +825,10 @@ function DetailPanel({
               <div style={{ gridColumn: 'span 3' }}>
                 <label style={labelStyle}>Open to Intern</label>
                 {isEditing ? (
-                  <select value={record.intake?.openToIntern || ''} onChange={(e) => onChange('intake.openToIntern', e.target.value)} style={inputStyle}>
+                  <select value={normalizeInternValue(record.intake?.openToIntern)} onChange={(e) => onChange('intake.openToIntern', e.target.value)} style={inputStyle}>
                     <option value="">—</option>
                     <option value="yes">Yes</option>
-                    <option value="Would like to discuss:">Would like to discuss</option>
+                    <option value="would like to discuss">Would like to discuss</option>
                     <option value="no">No</option>
                   </select>
                 ) : (
