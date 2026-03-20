@@ -233,13 +233,26 @@ function NewEntryModal({ onClose, onCreated }) {
                 <select value={draft.intake.openToIntern} onChange={(e) => update('intake.openToIntern', e.target.value)} style={inputStyle}>
                   <option value="">—</option>
                   <option value="yes">Yes</option>
+                  <option value="Would like to discuss:">Would like to discuss</option>
                   <option value="no">No</option>
                 </select>
               </div>
 
               <div style={{ gridColumn: 'span 3' }}>
                 <label style={labelStyle}>Insurance</label>
-                <input type="text" value={draft.intake.insurance} onChange={(e) => update('intake.insurance', e.target.value)} style={inputStyle} />
+                <select value={draft.intake.insurance} onChange={(e) => update('intake.insurance', e.target.value)} style={inputStyle}>
+                  <option value="">—</option>
+                  <option>Premera</option>
+                  <option>Regence</option>
+                  <option>Other BCBS</option>
+                  <option>Aetna</option>
+                  <option>Cigna</option>
+                  <option>UHC-Commercial</option>
+                  <option>Molina-Commercial</option>
+                  <option>Molina-Medicaid</option>
+                  <option>UHC-Medicaid</option>
+                  <option>Private Pay</option>
+                </select>
               </div>
               <div style={{ gridColumn: 'span 3' }}>
                 <label style={labelStyle}>Member ID</label>
@@ -263,15 +276,23 @@ function NewEntryModal({ onClose, onCreated }) {
 
               <div style={{ gridColumn: 'span 2' }}>
                 <label style={labelStyle}>Prev. Therapy</label>
-                <input type="text" value={draft.intake.previousTherapy} onChange={(e) => update('intake.previousTherapy', e.target.value)} style={inputStyle} />
+                <select value={draft.intake.previousTherapy} onChange={(e) => update('intake.previousTherapy', e.target.value)} style={inputStyle}>
+                  <option value="">—</option>
+                  <option value="Yes, in the past">Yes, in the past</option>
+                  <option value="Yes, currently">Yes, currently</option>
+                  <option value="No history">No history</option>
+                </select>
+
               </div>
               <div style={{ gridColumn: 'span 2' }}>
                 <label style={labelStyle}>Meds</label>
-                <input type="text" value={draft.intake.previousMeds} onChange={(e) => update('intake.previousMeds', e.target.value)} style={inputStyle} />
-              </div>
-              <div style={{ gridColumn: 'span 2' }}>
-                <label style={labelStyle}>Safety</label>
-                <input type="text" value={draft.intake.safety} onChange={(e) => update('intake.safety', e.target.value)} style={inputStyle} />
+                <select value={draft.intake.previousMeds} onChange={(e) => update('intake.previousMeds', e.target.value)} style={inputStyle}>
+                  <option value="">—</option>
+                  <option value="Yes, in the past">Yes, in the past</option>
+                  <option value="Yes, currently">Yes, currently</option>
+                  <option value="Yes currently and in the past">Yes, currently and in the past</option>
+                  <option value="No history">No history</option>
+                </select>
               </div>
 
               <div style={{ gridColumn: 'span 2' }}>
@@ -289,6 +310,16 @@ function NewEntryModal({ onClose, onCreated }) {
                   <option value="In-Person">In-Person</option>
                   <option value="Telehealth">Telehealth</option>
                   <option value="Both">Both</option>
+                </select>
+              </div>
+              <div style={{ gridColumn: 'span 2' }}>
+                <label style={labelStyle}>Safety</label>
+                <select value={draft.intake.safety} onChange={(e) => update('intake.safety', e.target.value)} style={inputStyle}>
+                  <option value="">—</option>
+                  <option value="Yes, less than 3 months ago">Yes, less than 3 months ago</option>
+                  <option value="Yes, more than 3 months ago">Yes, more than 3 months ago</option>
+                  <option value="No, never">No history</option>
+
                 </select>
               </div>
             </div>
@@ -775,7 +806,12 @@ function DetailPanel({
               <div style={{ gridColumn: 'span 3' }}>
                 <label style={labelStyle}>Open to Intern</label>
                 {isEditing ? (
-                  <input type="text" value={record.intake?.openToIntern || ''} onChange={(e) => onChange('intake.openToIntern', e.target.value)} style={inputStyle} />
+                  <select value={record.intake?.openToIntern || ''} onChange={(e) => onChange('intake.openToIntern', e.target.value)} style={inputStyle}>
+                    <option value="">—</option>
+                    <option value="yes">Yes</option>
+                    <option value="Would like to discuss:">Would like to discuss</option>
+                    <option value="no">No</option>
+                  </select>
                 ) : (
                   <div style={readValueStyle}>{record.intake?.openToIntern || '—'}</div>
                 )}
@@ -785,7 +821,19 @@ function DetailPanel({
               <div style={{ gridColumn: 'span 3' }}>
                 <label style={labelStyle}>Insurance</label>
                 {isEditing ? (
-                  <input type="text" value={record.intake?.insurance || ''} onChange={(e) => onChange('intake.insurance', e.target.value)} style={inputStyle} />
+                  <select value={record.intake?.insurance || ''} onChange={(e) => onChange('intake.insurance', e.target.value)} style={inputStyle}>
+                    <option value="">—</option>
+                    <option>Premera</option>
+                    <option>Regence</option>
+                    <option>Other BCBS</option>
+                    <option>Aetna</option>
+                    <option>Cigna</option>
+                    <option>UHC-Commercial</option>
+                    <option>Molina-Commercial</option>
+                    <option>Molina-Medicaid</option>
+                    <option>UHC-Medicaid</option>
+                    <option>Private Pay</option>
+                  </select>
                 ) : (
                   <div style={readValueStyle}>{record.intake?.insurance || '—'}</div>
                 )}
@@ -833,7 +881,12 @@ function DetailPanel({
               <div style={{ gridColumn: 'span 2' }}>
                 <label style={labelStyle}>Prev. Therapy</label>
                 {isEditing ? (
-                  <input type="text" value={record.intake?.previousTherapy || ''} onChange={(e) => onChange('intake.previousTherapy', e.target.value)} style={inputStyle} />
+                  <select value={record.intake?.previousTherapy || ''} onChange={(e) => onChange('intake.previousTherapy', e.target.value)} style={inputStyle}>
+                    <option value="">—</option>
+                    <option value="Yes, in the past">Yes, in the past</option>
+                    <option value="Yes, currently">Yes, currently</option>
+                    <option value="No history">No history</option>
+                  </select>
                 ) : (
                   <div style={readValueStyle}>{record.intake?.previousTherapy || '—'}</div>
                 )}
@@ -841,7 +894,13 @@ function DetailPanel({
               <div style={{ gridColumn: 'span 2' }}>
                 <label style={labelStyle}>Meds</label>
                 {isEditing ? (
-                  <input type="text" value={record.intake?.previousMeds || ''} onChange={(e) => onChange('intake.previousMeds', e.target.value)} style={inputStyle} />
+                  <select value={record.intake?.previousMeds || ''} onChange={(e) => onChange('intake.previousMeds', e.target.value)} style={inputStyle}>
+                    <option value="">—</option>
+                    <option value="Yes, in the past">Yes, in the past</option>
+                    <option value="Yes, currently">Yes, currently</option>
+                    <option value="Yes currently and in the past">Yes, currently and in the past</option>
+                    <option value="No history">No history</option>
+                  </select>
                 ) : (
                   <div style={readValueStyle}>{record.intake?.previousMeds || '—'}</div>
                 )}
@@ -849,7 +908,12 @@ function DetailPanel({
               <div style={{ gridColumn: 'span 2' }}>
                 <label style={labelStyle}>Safety</label>
                 {isEditing ? (
-                  <input type="text" value={record.intake?.safety || ''} onChange={(e) => onChange('intake.safety', e.target.value)} style={inputStyle} />
+                  <select value={record.intake?.safety || ''} onChange={(e) => onChange('intake.safety', e.target.value)} style={inputStyle}>
+                    <option value="">—</option>
+                    <option value="Yes, less than 3 months ago">Yes, less than 3 months ago</option>
+                    <option value="Yes, more than 3 months ago">Yes, more than 3 months ago</option>
+                    <option value="No, never">No history</option>
+                  </select>
                 ) : (
                   <div style={readValueStyle}>{record.intake?.safety || '—'}</div>
                 )}
@@ -899,7 +963,9 @@ export default function App() {
   const [draftInquiry, setDraftInquiry] = useState(null);
   const [saving, setSaving] = useState(false);
   const [collapsedColumns, setCollapsedColumns] = useState({});
-  const [pipelineFilters, setPipelineFilters] = useState({ insurance: [], service: [], provider: [], internOk: false });
+  const [columnSort, setColumnSort] = useState({});
+  const [pipelineFilters, setPipelineFilters] = useState({ name: '', phone: '', insurance: [], provider: '', internOk: false });
+  const [insuranceDropdownOpen, setInsuranceDropdownOpen] = useState(false);
   const [search, setSearch] = useState({ name: '', phone: '', email: '', insurance: '', date: '' });
   const [activeView, setActiveView] = useState({ type: 'all', value: '' });
   const [currentPage, setCurrentPage] = useState(1);
@@ -1117,20 +1183,6 @@ export default function App() {
 
   const totalPages = Math.ceil(filteredInquiries.length / PAGE_SIZE);
 
-  const pipelineFilterOptions = useMemo(() => {
-    const activeStatuses = new Set(columns.map(c => c.id));
-    const active = intakes.filter(r => activeStatuses.has(r.pipeline?.status));
-    return {
-      insurance: [...new Set(active.map(r => r.intake?.insurance).filter(Boolean))].sort(),
-      service: [...new Set(active.flatMap(r => {
-        const s = r.intake?.servicesRequested;
-        if (!s) return [];
-        return Array.isArray(s) ? s : s.split(',').map(x => x.trim());
-      }).filter(Boolean))].sort(),
-      provider: [...new Set(active.map(r => r.pipeline?.assignedProvider).filter(Boolean))].sort(),
-    };
-  }, [intakes]);
-
   const viewOptions = useMemo(() => ({
     status: [...new Set(intakes.map(r => r.pipeline?.status).filter(Boolean))].sort(),
     insurance: [...new Set(intakes.map(r => r.intake?.insurance).filter(Boolean))].sort(),
@@ -1247,38 +1299,100 @@ export default function App() {
 
               {/* Pipeline filters */}
               {(() => {
-                const toggleFilter = (category, value) => {
-                  setPipelineFilters(prev => ({
-                    ...prev,
-                    [category]: prev[category].includes(value)
-                      ? prev[category].filter(v => v !== value)
-                      : [...prev[category], value],
-                  }));
-                };
+                const insuranceOptions = ['Premera','Regence','Other BCBS','Aetna','Cigna','UHC-Commercial','Molina-Commercial','Molina-Medicaid','UHC-Medicaid','Private Pay'];
+                const anyActive = pipelineFilters.name || pipelineFilters.phone || pipelineFilters.insurance.length || pipelineFilters.provider || pipelineFilters.internOk;
+                const inputSm = { padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13, background: '#fff', boxSizing: 'border-box' };
                 const pillStyle = (active) => ({
-                  padding: '4px 12px',
-                  borderRadius: 20,
-                  border: '1px solid',
-                  fontSize: 13,
-                  cursor: 'pointer',
-                  borderColor: active ? '#7c3aed' : '#d1d5db',
-                  background: active ? '#ede9fe' : '#fff',
-                  color: active ? '#6d28d9' : '#374151',
-                  fontWeight: active ? 600 : 400,
+                  padding: '6px 12px', borderRadius: 20, border: '1px solid', fontSize: 13, cursor: 'pointer',
+                  borderColor: active ? '#7c3aed' : '#d1d5db', background: active ? '#ede9fe' : '#fff',
+                  color: active ? '#6d28d9' : '#374151', fontWeight: active ? 600 : 400,
                 });
-                const anyActive = pipelineFilters.insurance.length || pipelineFilters.service.length || pipelineFilters.provider.length || pipelineFilters.internOk;
                 return (
-                  <div style={{ position: 'sticky', top: 0, zIndex: 10, background: '#f7f7f8', paddingTop: 8, paddingBottom: 12, marginBottom: 12, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                    {pipelineFilterOptions.insurance.map(v => (
-                      <button key={`ins-${v}`} onClick={() => toggleFilter('insurance', v)} style={pillStyle(pipelineFilters.insurance.includes(v))}>{v}</button>
-                    ))}
-                    {pipelineFilterOptions.service.map(v => (
-                      <button key={`svc-${v}`} onClick={() => toggleFilter('service', v)} style={pillStyle(pipelineFilters.service.includes(v))}>{v}</button>
-                    ))}
-                    <button onClick={() => setPipelineFilters(prev => ({ ...prev, internOk: !prev.internOk }))} style={pillStyle(pipelineFilters.internOk)}>Intern OK</button>
-                    {anyActive ? (
-                      <button onClick={() => setPipelineFilters({ insurance: [], service: [], provider: [], internOk: false })} style={{ ...pillStyle(false), color: '#9ca3af' }}>Clear</button>
-                    ) : null}
+                  <div style={{ paddingTop: 8, paddingBottom: 12, marginBottom: 12, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <input
+                      type="text"
+                      placeholder="Name"
+                      value={pipelineFilters.name}
+                      onChange={e => setPipelineFilters(p => ({ ...p, name: e.target.value }))}
+                      style={{ ...inputSm, width: 300 }}
+                    />
+                    <input
+                      type="text"
+                      placeholder="Phone"
+                      value={pipelineFilters.phone}
+                      onChange={e => setPipelineFilters(p => ({ ...p, phone: e.target.value }))}
+                      style={{ ...inputSm, width: 250 }}
+                    />
+
+                    {/* Insurance multi-select */}
+                    <div style={{ position: 'relative' }}>
+                      <button
+                        onClick={() => setInsuranceDropdownOpen(o => !o)}
+                        style={{
+                          ...inputSm,
+                          cursor: 'pointer',
+                          minWidth: 200,
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6,
+                          borderColor: pipelineFilters.insurance.length ? '#7c3aed' : '#d1d5db',
+                          background: pipelineFilters.insurance.length ? '#ede9fe' : '#fff',
+                          color: pipelineFilters.insurance.length ? '#6d28d9' : '#374151',
+                          fontWeight: pipelineFilters.insurance.length ? 600 : 400,
+                        }}
+                      >
+                        {pipelineFilters.insurance.length ? `Insurance (${pipelineFilters.insurance.length})` : 'Insurance'}
+                        <span style={{ fontSize: 10 }}>▾</span>
+                      </button>
+                      {insuranceDropdownOpen && (
+                        <div style={{ position: 'absolute', top: '110%', left: 0, zIndex: 50, background: '#fff', border: '1px solid #d1d5db', borderRadius: 10, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', padding: '8px 0', minWidth: 200 }}>
+                          {insuranceOptions.map(v => (
+                            <label key={v} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 13, userSelect: 'none' }}
+                              onMouseEnter={e => e.currentTarget.style.background = '#f5f3ff'}
+                              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={pipelineFilters.insurance.includes(v)}
+                                onChange={() => setPipelineFilters(p => ({
+                                  ...p,
+                                  insurance: p.insurance.includes(v) ? p.insurance.filter(x => x !== v) : [...p.insurance, v],
+                                }))}
+                              />
+                              {v}
+                            </label>
+                          ))}
+                          {pipelineFilters.insurance.length > 0 && (
+                            <>
+                              <div style={{ borderTop: '1px solid #e5e7eb', margin: '6px 0' }} />
+                              <button
+                                onClick={() => { setPipelineFilters(p => ({ ...p, insurance: [] })); setInsuranceDropdownOpen(false); }}
+                                style={{ display: 'block', width: '100%', textAlign: 'left', padding: '6px 14px', fontSize: 13, color: '#9ca3af', background: 'none', border: 'none', cursor: 'pointer' }}
+                              >
+                                Clear
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <input
+                      type="text"
+                      placeholder="Preferred Provider"
+                      value={pipelineFilters.provider}
+                      onChange={e => setPipelineFilters(p => ({ ...p, provider: e.target.value }))}
+                      style={{ ...inputSm, width: 180 }}
+                    />
+
+                    <button onClick={() => setPipelineFilters(p => ({ ...p, internOk: !p.internOk }))} style={pillStyle(pipelineFilters.internOk)}>Intern OK</button>
+
+                    {anyActive && (
+                      <button
+                        onClick={() => { setPipelineFilters({ name: '', phone: '', insurance: [], provider: '', internOk: false }); setInsuranceDropdownOpen(false); }}
+                        style={{ ...pillStyle(false), color: '#9ca3af' }}
+                      >
+                        Clear All
+                      </button>
+                    )}
                   </div>
                 );
               })()}
@@ -1295,17 +1409,22 @@ export default function App() {
                     }}
                   >
                     {columns.map((column) => {
+                      const sort = columnSort[column.id] || 'date';
                       const columnCards = intakes.filter((intake) => {
                         if (intake.pipeline?.status !== column.id) return false;
+                        if (pipelineFilters.name && !(intake.intake?.clientName || '').toLowerCase().includes(pipelineFilters.name.toLowerCase())) return false;
+                        if (pipelineFilters.phone && !(intake.intake?.phone || '').includes(pipelineFilters.phone)) return false;
                         if (pipelineFilters.insurance.length && !pipelineFilters.insurance.includes(intake.intake?.insurance)) return false;
-                        if (pipelineFilters.provider.length && !pipelineFilters.provider.includes(intake.pipeline?.assignedProvider)) return false;
-                        if (pipelineFilters.service.length) {
-                          const s = intake.intake?.servicesRequested;
-                          const services = Array.isArray(s) ? s : (s || '').split(',').map(x => x.trim());
-                          if (!pipelineFilters.service.some(f => services.includes(f))) return false;
-                        }
+                        if (pipelineFilters.provider && !(intake.intake?.preferredProvider || '').toLowerCase().includes(pipelineFilters.provider.toLowerCase())) return false;
                         if (pipelineFilters.internOk && (!intake.intake?.openToIntern || intake.intake.openToIntern.toLowerCase() === 'no')) return false;
                         return true;
+                      }).sort((a, b) => {
+                        if (sort === 'az') {
+                          return (a.intake?.clientName || '').localeCompare(b.intake?.clientName || '');
+                        }
+                        const aTime = a.createdAt?.toMillis?.() ?? (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+                        const bTime = b.createdAt?.toMillis?.() ?? (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+                        return sort === 'date-asc' ? aTime - bTime : bTime - aTime;
                       });
                       const isCollapsed = collapsedColumns[column.id];
 
@@ -1358,7 +1477,7 @@ export default function App() {
                                   </h3>
                                 </div>
 
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                                   <span
                                     style={{
                                       fontSize: 12,
@@ -1374,14 +1493,51 @@ export default function App() {
 
                                   <button
                                     type="button"
+                                    onClick={() => setColumnSort(prev => ({
+                                      ...prev,
+                                      [column.id]: sort === 'date' ? 'date-asc' : 'date',
+                                    }))}
+                                    style={{
+                                      border: `1px solid ${column.border}`,
+                                      background: sort === 'date' || sort === 'date-asc' ? column.border : '#fff',
+                                      color: sort === 'date' || sort === 'date-asc' ? '#fff' : '#374151',
+                                      borderRadius: 8,
+                                      padding: '3px 7px',
+                                      cursor: 'pointer',
+                                      fontSize: 11,
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    Date {sort === 'date-asc' ? '↑' : '↓'}
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => setColumnSort(prev => ({ ...prev, [column.id]: 'az' }))}
+                                    style={{
+                                      border: `1px solid ${column.border}`,
+                                      background: sort === 'az' ? column.border : '#fff',
+                                      color: sort === 'az' ? '#fff' : '#374151',
+                                      borderRadius: 8,
+                                      padding: '3px 7px',
+                                      cursor: 'pointer',
+                                      fontSize: 11,
+                                      fontWeight: 600,
+                                    }}
+                                  >
+                                    A–Z
+                                  </button>
+
+                                  <button
+                                    type="button"
                                     onClick={() => toggleColumn(column.id)}
                                     style={{
                                       border: `1px solid ${column.border}`,
                                       background: '#fff',
                                       borderRadius: 8,
-                                      padding: '4px 8px',
+                                      padding: '3px 7px',
                                       cursor: 'pointer',
-                                      fontSize: 12,
+                                      fontSize: 11,
                                       fontWeight: 600,
                                     }}
                                   >

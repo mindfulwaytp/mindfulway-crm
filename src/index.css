@@ -24,7 +24,7 @@
 html,
 #root {
   width: 100%;
-  max-width: 2000px;
+  max-width: 2500px;
   margin: 0 auto;
   border-left: 1px solid var(--border);
   border-right: 1px solid var(--border);
