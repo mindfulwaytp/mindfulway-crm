@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import PROVIDERS from './providers';
 import {
   DragDropContext,
   Droppable,
@@ -39,6 +40,85 @@ function formatDate(value) {
 
 function cloneData(data) {
   return JSON.parse(JSON.stringify(data));
+}
+
+function ProviderSelect({ value, onChange, inputStyle }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+  const selected = value ? value.split(',').map(s => s.trim()).filter(Boolean) : [];
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const toggle = (p) => {
+    const next = selected.includes(p) ? selected.filter(s => s !== p) : [...selected, p];
+    onChange(next.join(', '));
+  };
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        style={{
+          ...inputStyle,
+          cursor: 'pointer',
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 6,
+          textAlign: 'left',
+          borderColor: selected.length ? '#7c3aed' : '#d1d5db',
+          background: selected.length ? '#faf5ff' : '#fff',
+        }}
+      >
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {selected.length ? selected.join(', ') : '—'}
+        </span>
+        <span style={{ fontSize: 10, flexShrink: 0 }}>▾</span>
+      </button>
+      {open && (
+        <div
+          onMouseDown={e => e.stopPropagation()}
+          style={{ position: 'absolute', top: '110%', left: 0, zIndex: 50, background: '#fff', border: '1px solid #d1d5db', borderRadius: 10, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', padding: '8px 0', minWidth: '100%', maxHeight: 220, overflowY: 'auto' }}
+        >
+          {PROVIDERS.map(p => (
+            <label
+              key={p}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 13, userSelect: 'none' }}
+              onMouseEnter={e => e.currentTarget.style.background = '#f5f3ff'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+            >
+              <input
+                type="checkbox"
+                checked={selected.includes(p)}
+                onChange={() => toggle(p)}
+              />
+              {p}
+            </label>
+          ))}
+          {selected.length > 0 && (
+            <>
+              <div style={{ borderTop: '1px solid #e5e7eb', margin: '6px 0' }} />
+              <button
+                onMouseDown={e => e.stopPropagation()}
+                onClick={() => { onChange(''); setOpen(false); }}
+                style={{ display: 'block', width: '100%', textAlign: 'left', padding: '6px 14px', fontSize: 13, color: '#9ca3af', background: 'none', border: 'none', cursor: 'pointer' }}
+              >
+                Clear
+              </button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 const blankDraft = {
@@ -180,11 +260,11 @@ function NewEntryModal({ onClose, onCreated }) {
               </div>
               <div>
                 <label style={labelStyle}>Assigned Provider</label>
-                <input type="text" value={draft.pipeline.assignedProvider} onChange={(e) => update('pipeline.assignedProvider', e.target.value)} style={inputStyle} />
+                <ProviderSelect value={draft.pipeline.assignedProvider} onChange={v => update('pipeline.assignedProvider', v)} inputStyle={inputStyle} />
               </div>
               <div>
                 <label style={labelStyle}>Possible Providers</label>
-                <input type="text" value={draft.pipeline.possibleProviders} onChange={(e) => update('pipeline.possibleProviders', e.target.value)} style={inputStyle} />
+                <ProviderSelect value={draft.pipeline.possibleProviders} onChange={v => update('pipeline.possibleProviders', v)} inputStyle={inputStyle} />
               </div>
               <div style={{ gridColumn: '1 / -1' }}>
                 <label style={labelStyle}>Comments</label>
@@ -226,7 +306,7 @@ function NewEntryModal({ onClose, onCreated }) {
 
               <div style={{ gridColumn: 'span 3' }}>
                 <label style={labelStyle}>Preferred Provider</label>
-                <input type="text" value={draft.intake.preferredProvider} onChange={(e) => update('intake.preferredProvider', e.target.value)} style={inputStyle} />
+                <ProviderSelect value={draft.intake.preferredProvider} onChange={v => update('intake.preferredProvider', v)} inputStyle={inputStyle} />
               </div>
               <div style={{ gridColumn: 'span 3' }}>
                 <label style={labelStyle}>Open to Intern</label>
@@ -307,9 +387,11 @@ function NewEntryModal({ onClose, onCreated }) {
                 <label style={labelStyle}>In-Person / Tele</label>
                 <select value={draft.intake.ipTele} onChange={(e) => update('intake.ipTele', e.target.value)} style={inputStyle}>
                   <option value="">—</option>
-                  <option value="In-Person">In-Person</option>
-                  <option value="Telehealth">Telehealth</option>
-                  <option value="Both">Both</option>
+                  <option value="In person only">In-Person Only</option>
+                  <option value="In person preferred">In-Person Preferred</option>
+                  <option value="Telehealth only">Telehealth</option>
+                  <option value="Telehealth preferred">Telehealth Preferred</option>
+                  <option value="No preference/first available">No preference/First Available</option>
                 </select>
               </div>
               <div style={{ gridColumn: 'span 2' }}>
@@ -625,12 +707,7 @@ function DetailPanel({
               <div>
                 <label style={labelStyle}>Assigned Provider</label>
                 {isEditing ? (
-                  <input
-                    type="text"
-                    value={record.pipeline?.assignedProvider || ''}
-                    onChange={(e) => onChange('pipeline.assignedProvider', e.target.value)}
-                    style={inputStyle}
-                  />
+                  <ProviderSelect value={record.pipeline?.assignedProvider || ''} onChange={v => onChange('pipeline.assignedProvider', v)} inputStyle={inputStyle} />
                 ) : (
                   <div style={readValueStyle}>
                     {record.pipeline?.assignedProvider || '—'}
@@ -641,12 +718,7 @@ function DetailPanel({
               <div>
                 <label style={labelStyle}>Possible Providers</label>
                 {isEditing ? (
-                  <input
-                    type="text"
-                    value={record.pipeline?.possibleProviders || ''}
-                    onChange={(e) => onChange('pipeline.possibleProviders', e.target.value)}
-                    style={inputStyle}
-                  />
+                  <ProviderSelect value={record.pipeline?.possibleProviders || ''} onChange={v => onChange('pipeline.possibleProviders', v)} inputStyle={inputStyle} />
                 ) : (
                   <div style={readValueStyle}>
                     {record.pipeline?.possibleProviders || '—'}
@@ -798,7 +870,7 @@ function DetailPanel({
               <div style={{ gridColumn: 'span 3' }}>
                 <label style={labelStyle}>Preferred Provider</label>
                 {isEditing ? (
-                  <input type="text" value={record.intake?.preferredProvider || ''} onChange={(e) => onChange('intake.preferredProvider', e.target.value)} style={inputStyle} />
+                  <ProviderSelect value={record.intake?.preferredProvider || ''} onChange={v => onChange('intake.preferredProvider', v)} inputStyle={inputStyle} />
                 ) : (
                   <div style={readValueStyle}>{record.intake?.preferredProvider || '—'}</div>
                 )}
@@ -939,7 +1011,14 @@ function DetailPanel({
               <div style={{ gridColumn: 'span 2' }}>
                 <label style={labelStyle}>In-Person / Tele</label>
                 {isEditing ? (
-                  <input type="text" value={record.intake?.ipTele || ''} onChange={(e) => onChange('intake.ipTele', e.target.value)} style={inputStyle} />
+                  <select value={record.intake?.ipTele || ''} onChange={(e) => onChange('intake.ipTele', e.target.value)} style={inputStyle}>
+                    <option value="">—</option>
+                    <option value="In person only">In-Person Only</option>
+                    <option value="In person preferred">In-Person Preferred</option>
+                    <option value="Telehealth only">Telehealth Only</option>
+                    <option value="Telehealth preferred">Telehealth Preferred</option>
+                    <option value="No preference/first available">No preference/First Available</option>
+                  </select>
                 ) : (
                   <div style={readValueStyle}>{record.intake?.ipTele || '—'}</div>
                 )}
@@ -964,7 +1043,7 @@ export default function App() {
   const [saving, setSaving] = useState(false);
   const [collapsedColumns, setCollapsedColumns] = useState({});
   const [columnSort, setColumnSort] = useState({});
-  const [pipelineFilters, setPipelineFilters] = useState({ name: '', phone: '', insurance: [], provider: '', internOk: false });
+  const [pipelineFilters, setPipelineFilters] = useState({ name: '', phone: '', insurance: [], provider: '', internOk: false, modality: [] });
   const [insuranceDropdownOpen, setInsuranceDropdownOpen] = useState(false);
   const [search, setSearch] = useState({ name: '', phone: '', email: '', insurance: '', date: '' });
   const [activeView, setActiveView] = useState({ type: 'all', value: '' });
@@ -1300,7 +1379,7 @@ export default function App() {
               {/* Pipeline filters */}
               {(() => {
                 const insuranceOptions = ['Premera','Regence','Other BCBS','Aetna','Cigna','UHC-Commercial','Molina-Commercial','Molina-Medicaid','UHC-Medicaid','Private Pay'];
-                const anyActive = pipelineFilters.name || pipelineFilters.phone || pipelineFilters.insurance.length || pipelineFilters.provider || pipelineFilters.internOk;
+                const anyActive = !!(pipelineFilters.name || pipelineFilters.phone || pipelineFilters.insurance.length || pipelineFilters.provider || pipelineFilters.internOk || pipelineFilters.modality.length);
                 const inputSm = { padding: '8px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13, background: '#fff', boxSizing: 'border-box' };
                 const pillStyle = (active) => ({
                   padding: '6px 12px', borderRadius: 20, border: '1px solid', fontSize: 13, cursor: 'pointer',
@@ -1383,11 +1462,28 @@ export default function App() {
                       style={{ ...inputSm, width: 180 }}
                     />
 
+                    {[
+                      { label: 'In Person', value: 'inperson' },
+                      { label: 'Telehealth', value: 'telehealth' },
+                      { label: 'No Preference', value: 'nopref' },
+                    ].map(({ label, value }) => (
+                      <button
+                        key={value}
+                        onClick={() => setPipelineFilters(p => ({
+                          ...p,
+                          modality: p.modality.includes(value) ? p.modality.filter(v => v !== value) : [...p.modality, value],
+                        }))}
+                        style={pillStyle(pipelineFilters.modality.includes(value))}
+                      >
+                        {label}
+                      </button>
+                    ))}
+
                     <button onClick={() => setPipelineFilters(p => ({ ...p, internOk: !p.internOk }))} style={pillStyle(pipelineFilters.internOk)}>Intern OK</button>
 
                     {anyActive && (
                       <button
-                        onClick={() => { setPipelineFilters({ name: '', phone: '', insurance: [], provider: '', internOk: false }); setInsuranceDropdownOpen(false); }}
+                        onClick={() => { setPipelineFilters({ name: '', phone: '', insurance: [], provider: '', internOk: false, modality: [] }); setInsuranceDropdownOpen(false); }}
                         style={{ ...pillStyle(false), color: '#9ca3af' }}
                       >
                         Clear All
@@ -1416,7 +1512,19 @@ export default function App() {
                         if (pipelineFilters.phone && !(intake.intake?.phone || '').includes(pipelineFilters.phone)) return false;
                         if (pipelineFilters.insurance.length && !pipelineFilters.insurance.includes(intake.intake?.insurance)) return false;
                         if (pipelineFilters.provider && !(intake.intake?.preferredProvider || '').toLowerCase().includes(pipelineFilters.provider.toLowerCase())) return false;
-                        if (pipelineFilters.internOk && (!intake.intake?.openToIntern || intake.intake.openToIntern.toLowerCase() === 'no')) return false;
+                        if (pipelineFilters.internOk) {
+                          const oi = (intake.intake?.openToIntern || '').toLowerCase();
+                          if (!oi || oi === 'no') return false;
+                        }
+                        if (pipelineFilters.modality.length) {
+                          const ip = (intake.intake?.ipTele || '').toLowerCase();
+                          const matches = {
+                            inperson: ip.includes('in person') || ip.includes('no preference'),
+                            telehealth: ip.includes('telehealth') || ip.includes('no preference'),
+                            nopref: ip.includes('no preference'),
+                          };
+                          if (!pipelineFilters.modality.some(m => matches[m])) return false;
+                        }
                         return true;
                       }).sort((a, b) => {
                         if (sort === 'az') {
@@ -1435,7 +1543,7 @@ export default function App() {
                               ref={provided.innerRef}
                               {...provided.droppableProps}
                               style={{
-                                width: 300,
+                                width: 360,
                                 flexShrink: 0,
                                 background: snapshot.isDraggingOver ? '#ffffff' : '#fafafa',
                                 borderRadius: 16,
@@ -1613,17 +1721,35 @@ export default function App() {
                                                     </span>
                                                   ))
                                                 ) : null}
-                                                {card.intake?.openToIntern && card.intake.openToIntern.toLowerCase() !== 'no' ? (
+                                                {(() => {
+                                                  const oi = (card.intake?.openToIntern || '').toLowerCase();
+                                                  if (!oi || oi === 'no') return null;
+                                                  const isDiscuss = oi.includes('discuss');
+                                                  return (
+                                                    <span style={{
+                                                      fontSize: 11,
+                                                      background: isDiscuss ? '#fff7ed' : '#d1fae5',
+                                                      color: isDiscuss ? '#c2410c' : '#065f46',
+                                                      borderRadius: 6,
+                                                      padding: '2px 7px',
+                                                      whiteSpace: 'nowrap',
+                                                      fontWeight: 500,
+                                                    }}>
+                                                      {isDiscuss ? 'Discuss Intern' : 'Intern OK'}
+                                                    </span>
+                                                  );
+                                                })()}
+                                                {card.intake?.ipTele ? (
                                                   <span style={{
                                                     fontSize: 11,
-                                                    background: '#d1fae5',
-                                                    color: '#065f46',
+                                                    background: '#e0f2fe',
+                                                    color: '#0369a1',
                                                     borderRadius: 6,
                                                     padding: '2px 7px',
                                                     whiteSpace: 'nowrap',
                                                     fontWeight: 500,
                                                   }}>
-                                                    Intern OK
+                                                    {card.intake.ipTele}
                                                   </span>
                                                 ) : null}
                                               </div>
@@ -1645,6 +1771,16 @@ export default function App() {
                                             <div style={{ fontSize: 13, marginTop: 6, color: '#555' }}>
                                               Insurance: {card.intake?.insurance || '—'}
                                             </div>
+                                            {card.intake?.preferredProvider ? (
+                                              <div style={{ fontSize: 12, marginTop: 3, color: '#374151' }}>
+                                                Preferred: {card.intake.preferredProvider}
+                                              </div>
+                                            ) : null}
+                                            {card.pipeline?.possibleProviders ? (
+                                              <div style={{ fontSize: 12, marginTop: 2, color: '#6b7280' }}>
+                                                Possible Providers: {card.pipeline.possibleProviders}
+                                              </div>
+                                            ) : null}
                                           </div>
                                         );
                                       }}

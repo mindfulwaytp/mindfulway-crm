@@ -1,4 +1,5 @@
 import { onRequest } from "firebase-functions/v2/https";
+import PROVIDERS from "./providers.js";
 import { logger } from "firebase-functions";
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
@@ -60,8 +61,8 @@ export const jotformWebhook = onRequest(async (req, res) => {
     const clientName = `${firstName} ${lastName}`.trim();
 
     const preferredProviders = Array.isArray(raw.q7_pleaseIndicate)
-      ? raw.q7_pleaseIndicate.join(", ")
-      : raw.q7_pleaseIndicate || "";
+      ? raw.q7_pleaseIndicate.map(matchProvider).join(", ")
+      : matchProvider(raw.q7_pleaseIndicate);
 
     const servicesRequested = Array.isArray(raw.q10_whatType)
       ? raw.q10_whatType.join(", ")
@@ -151,6 +152,13 @@ export const jotformWebhook = onRequest(async (req, res) => {
     return res.status(500).send("Webhook failed");
   }
 });
+
+function matchProvider(raw) {
+  if (!raw) return "";
+  const lower = raw.toLowerCase();
+  const match = PROVIDERS.find(p => lower.includes(p.split(",")[0].toLowerCase()));
+  return match || raw;
+}
 
 function formatDateObject(value) {
   if (!value || typeof value !== "object") return "";
