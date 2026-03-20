@@ -41,6 +41,13 @@ function formatDate(value) {
     return value.toDate().toLocaleDateString();
   }
 
+  // YYYY-MM-DD strings are parsed as UTC midnight by new Date(), causing an
+  // off-by-one day in local timezones. Parse as local time instead.
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const [y, m, d] = value.split('-').map(Number);
+    return new Date(y, m - 1, d).toLocaleDateString();
+  }
+
   const d = new Date(value);
   if (Number.isNaN(d.getTime())) return '—';
   return d.toLocaleDateString();
