@@ -455,6 +455,7 @@ function DetailPanel({
   const [showMatch, setShowMatch] = useState(false);
   const [matchResults, setMatchResults] = useState([]);
   const [assigning, setAssigning] = useState('');
+  const [expandedRows, setExpandedRows] = useState(new Set());
 
   function runMatch() {
     const results = matchProviders(inquiry, providerProfiles || []);
@@ -626,95 +627,111 @@ function DetailPanel({
         </div>
 
         {/* ── Find Match Results ───────────────────────────────────────── */}
-        {showMatch && (
-          <div style={{ marginBottom: 20, border: '1px solid #c4b5fd', borderRadius: 12, overflow: 'hidden' }}>
-            <div style={{ background: '#f5f3ff', padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontWeight: 700, fontSize: 14, color: '#6d28d9' }}>
-                Provider Match — {inquiry.intake?.clientName}
-              </span>
-              <span style={{ fontSize: 12, color: '#7c3aed' }}>
-                {matchResults.filter(r => r.blockers.length === 0).length} eligible of {matchResults.length}
-              </span>
-            </div>
-            <div style={{ maxHeight: 340, overflowY: 'auto' }}>
-              {matchResults.length === 0 ? (
-                <div style={{ padding: 16, fontSize: 13, color: '#6b7280' }}>No provider profiles found. Fill in profiles on the Providers page first.</div>
-              ) : matchResults.map((r) => {
-                const hasBlockers = r.blockers.length > 0;
-                const pctColor = r.pct >= 70 ? '#059669' : r.pct >= 40 ? '#d97706' : '#dc2626';
-                const pctBg    = r.pct >= 70 ? '#ecfdf5' : r.pct >= 40 ? '#fffbeb' : '#fef2f2';
-                const isAssigned = inquiry.pipeline?.assignedProvider === r.name;
-                return (
-                  <div
-                    key={r.name}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'flex-start',
-                      gap: 12,
-                      padding: '10px 16px',
-                      borderTop: '1px solid #ede9fe',
-                      background: isAssigned ? '#f5f3ff' : hasBlockers ? '#fafafa' : '#fff',
-                      opacity: hasBlockers ? 0.75 : 1,
-                    }}
-                  >
-                    {/* Score badge */}
-                    <div style={{
-                      minWidth: 46, textAlign: 'center',
-                      padding: '3px 0', borderRadius: 8,
-                      background: hasBlockers ? '#f3f4f6' : pctBg,
-                      color: hasBlockers ? '#9ca3af' : pctColor,
-                      fontWeight: 700, fontSize: 13,
-                      border: `1px solid ${hasBlockers ? '#e5e7eb' : pctColor + '44'}`,
-                    }}>
-                      {hasBlockers ? '—' : `${r.pct}%`}
-                    </div>
+        {showMatch && (() => {
+          const preferredNames = (inquiry.intake?.preferredProvider || '')
+            .split(',')
+            .map(s => s.replace(/\s*\(.*?\)/g, '').trim())
+            .filter(Boolean);
+          const visible = matchResults.filter(r => r.pct > 50 || preferredNames.includes(r.name));
+          return (
+            <div style={{ marginBottom: 20, border: '1px solid #c4b5fd', borderRadius: 12, overflow: 'hidden' }}>
+              <div style={{ background: '#f5f3ff', padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontWeight: 700, fontSize: 14, color: '#6d28d9' }}>
+                  Provider Match — {inquiry.intake?.clientName}
+                </span>
+                <span style={{ fontSize: 12, color: '#7c3aed' }}>
+                  {visible.length} above 50%{preferredNames.length > 0 ? ` + ${preferredNames.length} preferred` : ''}
+                </span>
+              </div>
+              <div style={{ maxHeight: 340, overflowY: 'auto' }}>
+                {matchResults.length === 0 ? (
+                  <div style={{ padding: 16, fontSize: 13, color: '#6b7280' }}>No provider profiles found. Fill in profiles on the Providers page first.</div>
+                ) : visible.length === 0 ? (
+                  <div style={{ padding: 16, fontSize: 13, color: '#6b7280' }}>No providers scored above 50%. Try filling in more profile data.</div>
+                ) : visible.map((r) => {
+                  const isPreferred = preferredNames.includes(r.name);
+                  const belowThreshold = r.pct <= 50;
+                  const pctColor = belowThreshold ? '#6b7280' : r.pct >= 70 ? '#059669' : '#d97706';
+                  const pctBg    = belowThreshold ? '#f3f4f6' : r.pct >= 70 ? '#ecfdf5' : '#fffbeb';
+                  const isAssigned = inquiry.pipeline?.assignedProvider === r.name;
+                  const isExpanded = expandedRows.has(r.name);
+                  const hasDetails = r.reasons.length > 0 || r.blockers.length > 0;
 
-                    {/* Name + details */}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
-                        {r.name}
-                        {isAssigned && <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 10, background: '#7c3aed', color: '#fff', fontWeight: 600 }}>Assigned</span>}
-                        {r.profile?.isIntern && <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 10, background: '#fef3c7', color: '#92400e', fontWeight: 600 }}>Intern</span>}
-                        {r.profile?.openSpaces > 0 && !hasBlockers && <span style={{ fontSize: 11, color: '#6b7280' }}>{r.profile.openSpaces} open</span>}
-                      </div>
-                      {r.reasons.length > 0 && (
-                        <div style={{ fontSize: 12, color: '#059669', marginTop: 2 }}>
-                          {r.reasons.slice(0, 3).join(' · ')}
-                        </div>
-                      )}
-                      {r.blockers.length > 0 && (
-                        <div style={{ fontSize: 12, color: '#dc2626', marginTop: 2 }}>
-                          {r.blockers.join(' · ')}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Assign button */}
-                    {!isAssigned && (
-                      <button
-                        onClick={() => handleAssign(r.name)}
-                        disabled={assigning === r.name}
-                        style={{
-                          padding: '4px 12px',
-                          borderRadius: 8,
-                          border: '1px solid #7c3aed',
-                          background: '#fff',
-                          color: '#7c3aed',
-                          fontWeight: 600,
-                          fontSize: 12,
-                          cursor: 'pointer',
+                  return (
+                    <div key={r.name} style={{ borderTop: '1px solid #ede9fe', background: isAssigned ? '#f5f3ff' : '#fff' }}>
+                      {/* Main row */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 16px' }}>
+                        {/* Score badge */}
+                        <div style={{
+                          minWidth: 46, textAlign: 'center',
+                          padding: '3px 0', borderRadius: 8,
+                          background: pctBg, color: pctColor,
+                          fontWeight: 700, fontSize: 13,
+                          border: `1px solid ${pctColor}44`,
                           flexShrink: 0,
-                        }}
-                      >
-                        {assigning === r.name ? '...' : 'Assign'}
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
+                        }}>
+                          {r.pct}%
+                        </div>
+
+                        {/* Name + badges */}
+                        <div style={{ flex: 1, fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                          {r.name}
+                          {isPreferred && <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 10, background: '#fef9c3', color: '#854d0e', fontWeight: 600, border: '1px solid #fde047' }}>Preferred</span>}
+                          {isAssigned && <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 10, background: '#7c3aed', color: '#fff', fontWeight: 600 }}>Assigned</span>}
+                          {r.profile?.isIntern && <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 10, background: '#fef3c7', color: '#92400e', fontWeight: 600 }}>Intern</span>}
+                          {r.profile?.openSpaces > 0 && <span style={{ fontSize: 11, color: '#9ca3af', fontWeight: 400 }}>{r.profile.openSpaces} open</span>}
+                        </div>
+
+                        {/* Expand arrow */}
+                        {hasDetails && (
+                          <button
+                            onClick={() => setExpandedRows(prev => {
+                              const next = new Set(prev);
+                              next.has(r.name) ? next.delete(r.name) : next.add(r.name);
+                              return next;
+                            })}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', fontSize: 14, padding: '2px 4px', flexShrink: 0, lineHeight: 1 }}
+                            title="Show details"
+                          >
+                            {isExpanded ? '▲' : '▼'}
+                          </button>
+                        )}
+
+                        {/* Assign button */}
+                        {!isAssigned && (
+                          <button
+                            onClick={() => handleAssign(r.name)}
+                            disabled={assigning === r.name}
+                            style={{
+                              padding: '4px 12px', borderRadius: 8,
+                              border: '1px solid #7c3aed', background: '#fff',
+                              color: '#7c3aed', fontWeight: 600, fontSize: 12,
+                              cursor: 'pointer', flexShrink: 0,
+                            }}
+                          >
+                            {assigning === r.name ? '...' : 'Assign'}
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Expandable details */}
+                      {isExpanded && hasDetails && (
+                        <div style={{ padding: '0 16px 10px 72px', display: 'flex', flexDirection: 'column', gap: 3 }}>
+                          {r.reasons.map((reason, i) => (
+                            <div key={i} style={{ fontSize: 12, color: '#059669' }}>✓ {reason}</div>
+                          ))}
+                          {r.blockers.map((blocker, i) => (
+                            <div key={i} style={{ fontSize: 12, color: '#dc2626' }}>✗ {blocker}</div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
         <div
           style={{
