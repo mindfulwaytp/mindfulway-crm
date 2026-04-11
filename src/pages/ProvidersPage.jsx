@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import PROVIDERS from '../providers';
 import { fetchProviderProfiles, upsertProviderProfile } from '../lib/providersProfileApi';
+import { SPECIALTIES } from '../lib/specialtyMap';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const TIMES = ['Morning', 'Afternoon', 'Evening'];
@@ -11,14 +12,6 @@ const INSURANCES = [
   'Premera', 'Regence', 'Other BCBS', 'Aetna', 'Cigna',
   'UHC-Commercial', 'Molina-Commercial', 'Molina-Medicaid',
   'UHC-Medicaid', 'Private Pay',
-];
-const SPECIALTIES = [
-  'Anxiety', 'Depression', 'Trauma/PTSD', 'ADHD/ADD', 'OCD',
-  'Grief & Loss', 'Relationship Issues', 'Family Conflict',
-  'Substance Use', 'Eating Disorders', 'LGBTQ+ Affirming',
-  'Autism/Neurodivergent', 'Anger Management', 'Bipolar Disorder',
-  'Personality Disorders', 'Life Transitions', 'Stress Management',
-  'Self-Esteem', 'Parenting Issues', 'Suicidality/Self-Harm',
 ];
 const LICENSURE_OPTIONS = [
   'LMFT', 'LCSW', 'LPC', 'LMHC', 'PhD', 'PsyD',
@@ -117,6 +110,7 @@ export default function ProvidersPage() {
   const [draft, setDraft] = useState(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
+  const [saveError, setSaveError] = useState(null);
   const [successMsg, setSuccessMsg] = useState('');
 
   useEffect(() => {
@@ -142,6 +136,7 @@ export default function ProvidersPage() {
     const existing = profiles[name] || {};
     setDraft({ ...EMPTY_PROFILE, ...existing, name });
     setEditingProvider(name);
+    setSaveError(null);
   }
 
   function closeEdit() {
@@ -151,6 +146,7 @@ export default function ProvidersPage() {
 
   async function saveEdit() {
     setSaving(true);
+    setSaveError(null);
     try {
       const { name, id, updatedAt, ...dataToSave } = draft;
       await upsertProviderProfile(editingProvider, dataToSave);
@@ -159,8 +155,8 @@ export default function ProvidersPage() {
       setTimeout(() => setSuccessMsg(''), 3000);
       closeEdit();
     } catch (e) {
-      setError('Failed to save. Please try again.');
-      console.error(e);
+      setSaveError(e?.message || 'Failed to save. Check console for details.');
+      console.error('upsertProviderProfile error:', e);
     } finally {
       setSaving(false);
     }
@@ -487,6 +483,11 @@ export default function ProvidersPage() {
             </Section>
 
             {/* Footer actions */}
+            {saveError && (
+              <div style={{ marginBottom: 12, padding: '10px 14px', borderRadius: 8, background: '#fef2f2', color: '#991b1b', fontSize: 13, border: '1px solid #fecaca' }}>
+                {saveError}
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
               <button
                 onClick={saveEdit}

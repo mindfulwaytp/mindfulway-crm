@@ -11,6 +11,9 @@ import {
   createInquiry,
 } from './lib/inquiriesApi';
 import ProvidersPage from './pages/ProvidersPage';
+import { parseChecklist } from './lib/specialtyMap';
+import { matchProviders } from './lib/matchProviders';
+import { fetchProviderProfiles } from './lib/providersProfileApi';
 
 const columns = [
   { id: 'new', title: 'New', color: '#8ec1fc', border: '#6caef8' },
@@ -445,8 +448,25 @@ function DetailPanel({
   onCancel,
   onSave,
   saving,
+  providerProfiles,
+  onQuickAssign,
 }) {
   const record = isEditing ? draft : inquiry;
+  const [showMatch, setShowMatch] = useState(false);
+  const [matchResults, setMatchResults] = useState([]);
+  const [assigning, setAssigning] = useState('');
+
+  function runMatch() {
+    const results = matchProviders(inquiry, providerProfiles || []);
+    setMatchResults(results);
+    setShowMatch(true);
+  }
+
+  async function handleAssign(name) {
+    setAssigning(name);
+    await onQuickAssign(name);
+    setAssigning('');
+  }
 
   if (!record) return null;
 
@@ -536,21 +556,38 @@ function DetailPanel({
           </button>
         </div>
 
-        <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 18, flexWrap: 'wrap' }}>
           {!isEditing ? (
-            <button
-              onClick={onEdit}
-              style={{
-                border: '1px solid #e5e7eb',
-                background: '#fff',
-                borderRadius: 10,
-                padding: '8px 12px',
-                cursor: 'pointer',
-                fontWeight: 600,
-              }}
-            >
-              Edit
-            </button>
+            <>
+              <button
+                onClick={onEdit}
+                style={{
+                  border: '1px solid #e5e7eb',
+                  background: '#fff',
+                  borderRadius: 10,
+                  padding: '8px 12px',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                }}
+              >
+                Edit
+              </button>
+              <button
+                onClick={showMatch ? () => setShowMatch(false) : runMatch}
+                disabled={!providerProfiles || providerProfiles.length === 0}
+                style={{
+                  border: '1px solid #7c3aed',
+                  background: showMatch ? '#7c3aed' : '#ede9fe',
+                  color: showMatch ? '#fff' : '#6d28d9',
+                  borderRadius: 10,
+                  padding: '8px 14px',
+                  cursor: 'pointer',
+                  fontWeight: 600,
+                }}
+              >
+                {showMatch ? 'Hide Match' : 'Find Match'}
+              </button>
+            </>
           ) : (
             <>
               <button
@@ -587,6 +624,97 @@ function DetailPanel({
             </>
           )}
         </div>
+
+        {/* ── Find Match Results ───────────────────────────────────────── */}
+        {showMatch && (
+          <div style={{ marginBottom: 20, border: '1px solid #c4b5fd', borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ background: '#f5f3ff', padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ fontWeight: 700, fontSize: 14, color: '#6d28d9' }}>
+                Provider Match — {inquiry.intake?.clientName}
+              </span>
+              <span style={{ fontSize: 12, color: '#7c3aed' }}>
+                {matchResults.filter(r => r.blockers.length === 0).length} eligible of {matchResults.length}
+              </span>
+            </div>
+            <div style={{ maxHeight: 340, overflowY: 'auto' }}>
+              {matchResults.length === 0 ? (
+                <div style={{ padding: 16, fontSize: 13, color: '#6b7280' }}>No provider profiles found. Fill in profiles on the Providers page first.</div>
+              ) : matchResults.map((r) => {
+                const hasBlockers = r.blockers.length > 0;
+                const pctColor = r.pct >= 70 ? '#059669' : r.pct >= 40 ? '#d97706' : '#dc2626';
+                const pctBg    = r.pct >= 70 ? '#ecfdf5' : r.pct >= 40 ? '#fffbeb' : '#fef2f2';
+                const isAssigned = inquiry.pipeline?.assignedProvider === r.name;
+                return (
+                  <div
+                    key={r.name}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: 12,
+                      padding: '10px 16px',
+                      borderTop: '1px solid #ede9fe',
+                      background: isAssigned ? '#f5f3ff' : hasBlockers ? '#fafafa' : '#fff',
+                      opacity: hasBlockers ? 0.75 : 1,
+                    }}
+                  >
+                    {/* Score badge */}
+                    <div style={{
+                      minWidth: 46, textAlign: 'center',
+                      padding: '3px 0', borderRadius: 8,
+                      background: hasBlockers ? '#f3f4f6' : pctBg,
+                      color: hasBlockers ? '#9ca3af' : pctColor,
+                      fontWeight: 700, fontSize: 13,
+                      border: `1px solid ${hasBlockers ? '#e5e7eb' : pctColor + '44'}`,
+                    }}>
+                      {hasBlockers ? '—' : `${r.pct}%`}
+                    </div>
+
+                    {/* Name + details */}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: 14, display: 'flex', alignItems: 'center', gap: 6 }}>
+                        {r.name}
+                        {isAssigned && <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 10, background: '#7c3aed', color: '#fff', fontWeight: 600 }}>Assigned</span>}
+                        {r.profile?.isIntern && <span style={{ fontSize: 11, padding: '1px 7px', borderRadius: 10, background: '#fef3c7', color: '#92400e', fontWeight: 600 }}>Intern</span>}
+                        {r.profile?.openSpaces > 0 && !hasBlockers && <span style={{ fontSize: 11, color: '#6b7280' }}>{r.profile.openSpaces} open</span>}
+                      </div>
+                      {r.reasons.length > 0 && (
+                        <div style={{ fontSize: 12, color: '#059669', marginTop: 2 }}>
+                          {r.reasons.slice(0, 3).join(' · ')}
+                        </div>
+                      )}
+                      {r.blockers.length > 0 && (
+                        <div style={{ fontSize: 12, color: '#dc2626', marginTop: 2 }}>
+                          {r.blockers.join(' · ')}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Assign button */}
+                    {!isAssigned && (
+                      <button
+                        onClick={() => handleAssign(r.name)}
+                        disabled={assigning === r.name}
+                        style={{
+                          padding: '4px 12px',
+                          borderRadius: 8,
+                          border: '1px solid #7c3aed',
+                          background: '#fff',
+                          color: '#7c3aed',
+                          fontWeight: 600,
+                          fontSize: 12,
+                          cursor: 'pointer',
+                          flexShrink: 0,
+                        }}
+                      >
+                        {assigning === r.name ? '...' : 'Assign'}
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
         <div
           style={{
@@ -890,7 +1018,27 @@ function DetailPanel({
                 {isEditing ? (
                   <textarea value={record.intake?.problemChecklist || ''} onChange={(e) => onChange('intake.problemChecklist', e.target.value)} rows={3} style={{ ...inputStyle, resize: 'vertical' }} />
                 ) : (
-                  <div style={readValueStyle}>{record.intake?.problemChecklist || '—'}</div>
+                  <>
+                    <div style={{ ...readValueStyle, marginBottom: 8 }}>{record.intake?.problemChecklist || '—'}</div>
+                    {(() => {
+                      const { matched, unmatched } = parseChecklist(record.intake?.problemChecklist);
+                      if (!matched.length && !unmatched.length) return null;
+                      return (
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 4 }}>
+                          {matched.map((s) => (
+                            <span key={s} style={{ padding: '2px 9px', borderRadius: 12, background: '#ede9fe', color: '#6d28d9', fontSize: 12, fontWeight: 600, border: '1px solid #c4b5fd' }}>
+                              {s}
+                            </span>
+                          ))}
+                          {unmatched.map((s) => (
+                            <span key={s} style={{ padding: '2px 9px', borderRadius: 12, background: '#f3f4f6', color: '#6b7280', fontSize: 12, border: '1px solid #e5e7eb' }}>
+                              {s}
+                            </span>
+                          ))}
+                        </div>
+                      );
+                    })()}
+                  </>
                 )}
               </div>
 
@@ -988,6 +1136,7 @@ function DetailPanel({
 
 export default function App() {
   const [intakes, setIntakes] = useState([]);
+  const [providerProfiles, setProviderProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [updatingId, setUpdatingId] = useState('');
@@ -1018,11 +1167,42 @@ export default function App() {
       }
     }
 
+    async function loadProfiles() {
+      try {
+        const profiles = await fetchProviderProfiles();
+        setProviderProfiles(profiles);
+      } catch (err) {
+        console.error('Failed to load provider profiles', err);
+      }
+    }
+
     loadIntakes();
+    loadProfiles();
 
     const interval = setInterval(loadIntakes, 10000);
     return () => clearInterval(interval);
   }, []);
+
+  async function handleQuickAssign(inquiryId, providerName) {
+    try {
+      await updateInquiryApi(inquiryId, { 'pipeline.assignedProvider': providerName });
+      setIntakes((prev) =>
+        prev.map((inq) =>
+          inq.id === inquiryId
+            ? { ...inq, pipeline: { ...inq.pipeline, assignedProvider: providerName } }
+            : inq
+        )
+      );
+      if (selectedInquiry?.id === inquiryId) {
+        setSelectedInquiry((prev) => ({
+          ...prev,
+          pipeline: { ...prev.pipeline, assignedProvider: providerName },
+        }));
+      }
+    } catch (err) {
+      console.error('Quick assign failed', err);
+    }
+  }
 
   function openInquiry(inquiry) {
     setSelectedInquiry(inquiry);
@@ -1963,6 +2143,8 @@ export default function App() {
             onCancel={handleCancelEdit}
             onSave={handleSaveEdit}
             saving={saving}
+            providerProfiles={providerProfiles}
+            onQuickAssign={(name) => handleQuickAssign(selectedInquiry.id, name)}
           />
         ) : null}
       </div>
