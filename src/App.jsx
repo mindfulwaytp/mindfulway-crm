@@ -10,6 +10,7 @@ import {
   updateInquiry as updateInquiryApi,
   createInquiry,
 } from './lib/inquiriesApi';
+import ProvidersPage from './pages/ProvidersPage';
 
 const columns = [
   { id: 'new', title: 'New', color: '#8ec1fc', border: '#6caef8' },
@@ -1285,6 +1286,22 @@ export default function App() {
           </button>
 
           <button
+            onClick={() => setView('providers')}
+            style={{
+              textAlign: 'left',
+              padding: '12px 14px',
+              borderRadius: 10,
+              border: '1px solid',
+              borderColor: view === 'providers' ? '#c4b5fd' : '#e5e7eb',
+              background: view === 'providers' ? '#f5f3ff' : '#fff',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Providers
+          </button>
+
+          <button
             onClick={() => setShowNewEntry(true)}
             style={{
               textAlign: 'left',
@@ -1304,6 +1321,9 @@ export default function App() {
       </aside>
 
       <div style={{ minWidth: 0 }}>
+        {view === 'providers' ? (
+          <ProvidersPage />
+        ) : (
         <main style={{ padding: 32, overflowX: 'clip', minWidth: 0 }}>
           {error ? (
             <div
@@ -1919,6 +1939,7 @@ export default function App() {
             </>
           )}
         </main>
+        )}
 
         {showNewEntry ? (
           <NewEntryModal
