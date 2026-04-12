@@ -1,9 +1,12 @@
 import { onRequest } from "firebase-functions/v2/https";
+import { defineSecret } from "firebase-functions/params";
 import PROVIDERS from "./providers.js";
 import { logger } from "firebase-functions";
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import Busboy from "busboy";
+
+const intakeToken = defineSecret("INTAKE_TOKEN");
 
 initializeApp();
 const db = getFirestore();
@@ -152,6 +155,88 @@ export const jotformWebhook = onRequest(async (req, res) => {
     return res.status(500).send("Webhook failed");
   }
 });
+
+// ── Google Sheets intake ──────────────────────────────────────────────────────
+
+export const sheetIntake = onRequest({ secrets: [intakeToken], invoker: "public" }, async (req, res) => {
+  if (req.method !== "POST") {
+    return res.status(405).send("Method Not Allowed");
+  }
+
+  const token = req.headers["x-intake-token"];
+  if (!token || token !== intakeToken.value()) {
+    logger.warn("SHEET_INTAKE_UNAUTHORIZED");
+    return res.status(401).send("Unauthorized");
+  }
+
+  try {
+    const data = req.body;
+
+    const clientName = (data.clientName || "").trim();
+    if (!clientName) {
+      return res.status(400).send("Missing clientName");
+    }
+
+    const nameParts = clientName.split(" ");
+    const firstName = nameParts[0] || "";
+    const lastName = nameParts.slice(1).join(" ") || "";
+
+    const parentName = (data.parentGuardianName || "").trim();
+    const parentParts = parentName ? parentName.split(" ") : [];
+
+    const responseId = data.responseId || `gs_${Date.now()}`;
+
+    const doc = {
+      source: "google_sheets",
+      intake: {
+        submissionDate: data.submittedAt || new Date().toISOString(),
+        clientName,
+        firstName,
+        lastName,
+        preferredName: data.preferredName || "",
+        phone: data.phone || "",
+        email: data.email || "",
+        dob: data.dob || "",
+        parentFirstName: parentParts[0] || "",
+        parentLastName: parentParts.slice(1).join(" ") || "",
+        insurance: data.insurance || "",
+        memberId: data.memberId || "",
+        preferredProvider: data.preferredProvider || "",
+        openToIntern: data.openToIntern || "",
+        servicesRequested: data.servicesRequested || "",
+        problemChecklist: data.problemChecklist || "",
+        promptedYou: data.promptedYou || "",
+        previousTherapy: data.previousTherapy || "",
+        previousMeds: data.previousMeds || "",
+        safety: data.safety || "",
+        days: data.days || "",
+        times: data.times || "",
+        ipTele: data.ipTele || "",
+        referralSource: data.referralSource || "",
+        tags: "",
+      },
+      pipeline: {
+        status: "new",
+        assignedProvider: "",
+        lastContactDate: "",
+        nextStep: "",
+        contactAttempts: 0,
+      },
+      createdAt: FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
+    };
+
+    await db.collection("inquiries").doc(responseId).set(doc, { merge: true });
+
+    logger.info(`SHEET_INTAKE_SAVED ${responseId} ${clientName}`);
+    return res.status(200).json({ ok: true, id: responseId });
+  } catch (err) {
+    logger.error(`SHEET_INTAKE_FAILED ${err?.message || err}`);
+    return res.status(500).send("Intake failed");
+  }
+});
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function matchProvider(raw) {
   if (!raw) return "";

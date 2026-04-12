@@ -60,19 +60,19 @@ function normalizeServices(raw) {
 //
 // Total possible (no blockers): 100 pts
 //   Insurance           30   – hard to work around
-//   Specialties         25   – partial credit per overlapping tag
-//   Session format      15   – in-person / telehealth fit
-//   Service modality    15   – offered modality match
-//   Day availability    10   – at least one overlapping day
-//   Intern OK            5   – intern preference match
+//   Specialties         15   – partial credit per overlapping tag
+//   Session format      20   – in-person / telehealth fit
+//   Service modality     5   – offered modality match
+//   Day availability    15   – at least one overlapping day
+//   Intern OK           10   – intern preference match
 
 const WEIGHTS = {
   insurance:   30,
-  specialties: 25,
-  format:      15,
-  modality:    15,
-  days:        10,
-  intern:       5,
+  specialties: 15,
+  format:      20,
+  modality:    5,
+  days:        15,
+  intern:      15,
 };
 
 // ── Main export ───────────────────────────────────────────────────────────────
