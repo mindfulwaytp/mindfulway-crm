@@ -10,9 +10,14 @@ import {
   createInquiry,
 } from './lib/inquiriesApi';
 import ProvidersPage from './pages/ProvidersPage';
+import AvailabilityPage from './pages/AvailabilityPage';
+import MyHoursPage from './pages/MyHoursPage';
+import InternHoursPage from './pages/InternHoursPage';
+import LoginPage from './pages/LoginPage';
 import { parseChecklist } from './lib/specialtyMap';
 import { matchProviders } from './lib/matchProviders';
 import { fetchProviderProfiles } from './lib/providersProfileApi';
+import { useAuth } from './lib/AuthContext';
 
 const columns = [
   { id: 'new', title: 'New', color: '#8ec1fc', border: '#6caef8' },
@@ -1152,6 +1157,41 @@ function DetailPanel({
 }
 
 export default function App() {
+  const { user, isAdmin, isSupervisor, isIntern, isProvider, accessDenied, loading: authLoading, signOut } = useAuth();
+
+  // Auth gate — must resolve before rendering anything
+  if (authLoading) {
+    return (
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f9fafb' }}>
+        <span style={{ fontSize: 14, color: '#6b7280' }}>Loading…</span>
+      </div>
+    );
+  }
+
+  if (!user || accessDenied) {
+    return <LoginPage accessDenied={accessDenied} userEmail={user?.email} />;
+  }
+
+  // Admin gets full CRM
+  if (isAdmin) return <AdminApp signOut={signOut} />;
+
+  // Interns and supervisors get availability + hours with tab nav
+  if (isIntern || isSupervisor) return <ProviderApp showHours />;
+
+  // Regular providers get availability only
+  if (isProvider) return <ProviderApp />;
+
+  // Fallback — shouldn't reach here but show access denied if roles are empty
+  return <LoginPage accessDenied userEmail={user?.email} />;
+}
+
+function ProviderApp({ showHours = false }) {
+  const [page, setPage] = useState('availability');
+  if (showHours && page === 'hours') return <MyHoursPage onNav={setPage} />;
+  return <AvailabilityPage onNav={showHours ? setPage : undefined} />;
+}
+
+function AdminApp({ signOut }) {
   const [intakes, setIntakes] = useState([]);
   const [providerProfiles, setProviderProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1499,6 +1539,38 @@ export default function App() {
           </button>
 
           <button
+            onClick={() => setView('availability')}
+            style={{
+              textAlign: 'left',
+              padding: '12px 14px',
+              borderRadius: 10,
+              border: '1px solid',
+              borderColor: view === 'availability' ? '#c4b5fd' : '#e5e7eb',
+              background: view === 'availability' ? '#f5f3ff' : '#fff',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Availability
+          </button>
+
+          <button
+            onClick={() => setView('intern-hours')}
+            style={{
+              textAlign: 'left',
+              padding: '12px 14px',
+              borderRadius: 10,
+              border: '1px solid',
+              borderColor: view === 'intern-hours' ? '#c4b5fd' : '#e5e7eb',
+              background: view === 'intern-hours' ? '#f5f3ff' : '#fff',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Intern Hours
+          </button>
+
+          <button
             onClick={() => setShowNewEntry(true)}
             style={{
               textAlign: 'left',
@@ -1514,12 +1586,33 @@ export default function App() {
           >
             + New Entry
           </button>
+
+          <button
+            onClick={signOut}
+            style={{
+              textAlign: 'left',
+              padding: '12px 14px',
+              borderRadius: 10,
+              border: '1px solid #e5e7eb',
+              background: '#fff',
+              color: '#6b7280',
+              fontWeight: 600,
+              cursor: 'pointer',
+              marginTop: 'auto',
+            }}
+          >
+            Sign out
+          </button>
         </nav>
       </aside>
 
       <div style={{ minWidth: 0 }}>
         {view === 'providers' ? (
           <ProvidersPage />
+        ) : view === 'availability' ? (
+          <AvailabilityPage />
+        ) : view === 'intern-hours' ? (
+          <InternHoursPage />
         ) : (
         <main style={{ padding: 32, overflowX: 'clip', minWidth: 0 }}>
           {error ? (

@@ -1,11 +1,101 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /inquiries/{document=**} {
-      allow read, write: if true;
+
+    // ── Helpers ──────────────────────────────────────────────────────────────
+
+    function isSignedIn() {
+      return request.auth != null;
     }
-    match /providers/{document=**} {
-      allow read, write: if true;
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    // Supports both legacy { role: 'admin' } and new { roles: ['admin', ...] }
+    function hasRole(r) {
+      let d = getUserData();
+      return isSignedIn() && (
+        (d.keys().hasAny(['roles']) && d.roles.hasAny([r])) ||
+        (d.keys().hasAny(['role']) && d.role == r)
+      );
+    }
+
+    function isAdmin() {
+      return hasRole('admin');
+    }
+
+    function isSupervisor() {
+      return hasRole('supervisor') || isAdmin();
+    }
+
+    function isProviderFor(providerName) {
+      let d = getUserData();
+      return isSignedIn() && d.providerName == providerName && (
+        (d.keys().hasAny(['roles']) && d.roles.hasAny(['provider', 'intern', 'supervisor'])) ||
+        (d.keys().hasAny(['role']) && d.role == 'provider')
+      );
+    }
+
+    function emailIsInAdminList() {
+      return get(/databases/$(database)/documents/config/admins).data.emails.hasAny([request.auth.token.email]);
+    }
+
+    // ── Inquiries — admin only ────────────────────────────────────────────────
+    match /inquiries/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    // ── Providers — any signed-in user can read; write = admin or own row ────
+    match /providers/{providerName} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isProviderFor(providerName);
+    }
+
+    // ── Intern profiles — admin write; intern or supervisor read ─────────────
+    match /internProfiles/{providerName} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ── Hour entries — intern creates own; admin/supervisor read all ─────────
+    match /hourEntries/{entryId} {
+      allow read: if isAdmin() || isSupervisor() ||
+        (isSignedIn() && getUserData().providerName == resource.data.internName);
+      allow create: if isSignedIn() &&
+        getUserData().providerName == request.resource.data.internName;
+      allow update, delete: if isAdmin();
+    }
+
+    // ── Change requests — intern creates own; admin/supervisor manage ────────
+    match /changeRequests/{reqId} {
+      allow read: if isAdmin() || isSupervisor() ||
+        (isSignedIn() && getUserData().providerName == resource.data.internName);
+      allow create: if isSignedIn() &&
+        getUserData().providerName == request.resource.data.internName;
+      allow update, delete: if isAdmin() || isSupervisor();
+    }
+
+    // ── Users — own read/create; admin full access ────────────────────────────
+    match /users/{uid} {
+      allow read: if isSignedIn() && request.auth.uid == uid;
+      allow read: if isAdmin();
+      allow create: if isSignedIn()
+        && request.auth.uid == uid
+        && (
+          request.resource.data.roles.hasAny(['provider', 'intern', 'supervisor'])
+          || (request.resource.data.roles.hasAny(['admin']) && emailIsInAdminList())
+          // legacy single-role support during transition
+          || request.resource.data.role == 'provider'
+          || (request.resource.data.role == 'admin' && emailIsInAdminList())
+        );
+      allow update, delete: if isAdmin();
+    }
+
+    // ── Config — signed-in read; no client writes ─────────────────────────────
+    match /config/{docId} {
+      allow read: if isSignedIn();
+      allow write: if false;
     }
   }
 }

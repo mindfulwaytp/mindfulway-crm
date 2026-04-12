@@ -18,11 +18,21 @@ const LICENSURE_OPTIONS = [
 ];
 const GENDER_OPTIONS = ['Female', 'Male', 'Non-binary', 'Prefer not to say'];
 
+const ROLE_OPTIONS = ['provider', 'intern', 'supervisor', 'admin'];
+const ROLE_LABELS = { provider: 'Provider', intern: 'Intern', supervisor: 'Supervisor', admin: 'Admin' };
+const ROLE_COLORS = {
+  provider: { bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' },
+  intern:   { bg: '#fef3c7', color: '#92400e', border: '#fde68a' },
+  supervisor: { bg: '#f0fdf4', color: '#166534', border: '#bbf7d0' },
+  admin:    { bg: '#fdf4ff', color: '#7e22ce', border: '#e9d5ff' },
+};
+
 const EMPTY_PROFILE = {
+  email: '',
+  roles: ['provider'],
   gender: '',
   pronouns: '',
   licensure: '',
-  isIntern: false,
   openSpaces: 0,
   availableDays: [],
   availableTimes: [],
@@ -289,11 +299,14 @@ export default function ProvidersPage() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-                  {p.isIntern && (
-                    <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#fef3c7', color: '#92400e', fontWeight: 600, border: '1px solid #fde68a' }}>
-                      Intern
-                    </span>
-                  )}
+                  {(p.roles || (p.isIntern ? ['intern'] : ['provider'])).filter(r => r !== 'provider').map(r => {
+                    const c = ROLE_COLORS[r] || ROLE_COLORS.provider;
+                    return (
+                      <span key={r} style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: c.bg, color: c.color, fontWeight: 600, border: `1px solid ${c.border}` }}>
+                        {ROLE_LABELS[r] || r}
+                      </span>
+                    );
+                  })}
                   <OpenSpacesBadge count={p.openSpaces} />
                   <span style={{ fontSize: 18, color: '#d1d5db' }}>›</span>
                 </div>
@@ -336,6 +349,20 @@ export default function ProvidersPage() {
 
             {/* Basic info */}
             <Section title="Basic Info">
+              <div style={{ marginBottom: 12 }}>
+                <Field label="Google Workspace Email">
+                  <input
+                    type="email"
+                    value={draft.email || ''}
+                    onChange={(e) => setDraftField('email', e.target.value)}
+                    placeholder="name@mindfulway-therapy.com"
+                    style={inputStyle}
+                  />
+                </Field>
+                <div style={{ marginTop: 4, fontSize: 11, color: '#9ca3af' }}>
+                  Required for the provider to log in. Must match their @mindfulway-therapy.com Google account.
+                </div>
+              </div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <Field label="Gender">
                   <select
@@ -376,16 +403,30 @@ export default function ProvidersPage() {
                   />
                 </Field>
               </div>
-              <div style={{ marginTop: 8 }}>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 14 }}>
-                  <input
-                    type="checkbox"
-                    checked={draft.isIntern}
-                    onChange={(e) => setDraftField('isIntern', e.target.checked)}
-                    style={{ width: 16, height: 16, accentColor: '#7c3aed' }}
-                  />
-                  <span>Intern / Associate (not independently licensed)</span>
-                </label>
+              <div style={{ marginTop: 12 }}>
+                <div style={{ fontWeight: 600, fontSize: 12, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 8 }}>
+                  Roles
+                </div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                  {ROLE_OPTIONS.map((r) => {
+                    const active = (draft.roles || []).includes(r);
+                    const c = ROLE_COLORS[r];
+                    return (
+                      <label key={r} style={{ display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer', padding: '5px 12px', borderRadius: 20, border: `1px solid ${active ? c.border : '#e5e7eb'}`, background: active ? c.bg : '#fff', fontSize: 13, fontWeight: active ? 600 : 400, color: active ? c.color : '#374151', userSelect: 'none' }}>
+                        <input
+                          type="checkbox"
+                          checked={active}
+                          onChange={() => {
+                            const current = draft.roles || [];
+                            setDraftField('roles', active ? current.filter(x => x !== r) : [...current, r]);
+                          }}
+                          style={{ display: 'none' }}
+                        />
+                        {ROLE_LABELS[r]}
+                      </label>
+                    );
+                  })}
+                </div>
               </div>
             </Section>
 

@@ -1,5 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore } from 'firebase/firestore';
+import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 
 const firebaseConfig = {
   apiKey: "AIzaSyBOLtG1Z-WMuhpYZomhFZ1TlOXAwKL857c",
@@ -12,3 +13,8 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
+export const auth = getAuth(app);
+export const googleProvider = new GoogleAuthProvider();
+
+// Restrict sign-in to @mindfulway-therapy.com accounts
+googleProvider.setCustomParameters({ hd: 'mindfulway-therapy.com' });
