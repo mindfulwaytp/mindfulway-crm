@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import PROVIDERS from '../providers';
-import { fetchProviderProfiles, upsertProviderProfile } from '../lib/providersProfileApi';
+import { fetchProviderProfiles, upsertProviderProfile, deleteProviderProfile } from '../lib/providersProfileApi';
 import { SPECIALTIES } from '../lib/specialtyMap';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
@@ -91,17 +90,6 @@ function OpenSpacesBadge({ count }) {
   );
 }
 
-function Chip({ label }) {
-  return (
-    <span style={{
-      padding: '2px 8px', borderRadius: 12,
-      background: '#f3f4f6', color: '#374151',
-      fontSize: 12, fontWeight: 500,
-    }}>
-      {label}
-    </span>
-  );
-}
 
 export default function ProvidersPage() {
   const [profiles, setProfiles] = useState({});
@@ -112,6 +100,11 @@ export default function ProvidersPage() {
   const [error, setError] = useState(null);
   const [saveError, setSaveError] = useState(null);
   const [successMsg, setSuccessMsg] = useState('');
+  const [newProviderName, setNewProviderName] = useState('');
+  const [addingProvider, setAddingProvider] = useState(false);
+  const [deletingProvider, setDeletingProvider] = useState(false);
+
+  const providerList = Object.keys(profiles).sort();
 
   useEffect(() => {
     loadProfiles();
@@ -166,161 +159,144 @@ export default function ProvidersPage() {
     setDraft((d) => ({ ...d, [key]: value }));
   }
 
+  async function addProvider() {
+    const name = newProviderName.trim();
+    if (!name) return;
+    setAddingProvider(true);
+    try {
+      await upsertProviderProfile(name, {});
+      setProfiles((prev) => ({ ...prev, [name]: { name } }));
+      setNewProviderName('');
+      setSuccessMsg(`${name} added.`);
+      setTimeout(() => setSuccessMsg(''), 3000);
+    } catch (e) {
+      setError('Failed to add provider.');
+      console.error(e);
+    } finally {
+      setAddingProvider(false);
+    }
+  }
+
+  async function deleteProvider(name) {
+    if (!window.confirm(`Remove ${name} from the system? This cannot be undone.`)) return;
+    setDeletingProvider(true);
+    try {
+      await deleteProviderProfile(name);
+      setProfiles((prev) => {
+        const next = { ...prev };
+        delete next[name];
+        return next;
+      });
+      setSuccessMsg(`${name} removed.`);
+      setTimeout(() => setSuccessMsg(''), 3000);
+      closeEdit();
+    } catch (e) {
+      setSaveError('Failed to delete provider.');
+      console.error(e);
+    } finally {
+      setDeletingProvider(false);
+    }
+  }
+
   // ── Card grid ──────────────────────────────────────────────────────────
   return (
     <div style={{ padding: 32 }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24, gap: 16 }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>Provider Profiles</h1>
           <p style={{ margin: '4px 0 0', fontSize: 13, color: '#6b7280' }}>
             Manage availability, modalities, insurances, and specialties for each clinician.
           </p>
         </div>
-        {successMsg && (
-          <div style={{ padding: '8px 16px', borderRadius: 8, background: '#ecfdf5', color: '#065f46', fontSize: 13, fontWeight: 600, border: '1px solid #a7f3d0' }}>
-            {successMsg}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <input
+              type="text"
+              value={newProviderName}
+              onChange={(e) => setNewProviderName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') addProvider(); }}
+              placeholder="New provider name…"
+              style={{ padding: '7px 10px', borderRadius: 7, border: '1px solid #d1d5db', fontSize: 13, width: 180 }}
+            />
+            <button
+              onClick={addProvider}
+              disabled={addingProvider || !newProviderName.trim()}
+              style={{
+                padding: '7px 14px', borderRadius: 7, border: 'none',
+                background: addingProvider || !newProviderName.trim() ? '#e5e7eb' : '#7c3aed',
+                color: addingProvider || !newProviderName.trim() ? '#9ca3af' : '#fff',
+                fontWeight: 600, fontSize: 13, cursor: addingProvider || !newProviderName.trim() ? 'default' : 'pointer',
+              }}
+            >
+              {addingProvider ? 'Adding…' : '+ Add'}
+            </button>
           </div>
-        )}
-        {error && (
-          <div style={{ padding: '8px 16px', borderRadius: 8, background: '#fef2f2', color: '#991b1b', fontSize: 13, fontWeight: 600, border: '1px solid #fecaca' }}>
-            {error}
-          </div>
-        )}
+          {successMsg && (
+            <div style={{ padding: '6px 12px', borderRadius: 8, background: '#ecfdf5', color: '#065f46', fontSize: 13, fontWeight: 600, border: '1px solid #a7f3d0' }}>
+              {successMsg}
+            </div>
+          )}
+          {error && (
+            <div style={{ padding: '6px 12px', borderRadius: 8, background: '#fef2f2', color: '#991b1b', fontSize: 13, fontWeight: 600, border: '1px solid #fecaca' }}>
+              {error}
+            </div>
+          )}
+        </div>
       </div>
 
       {loading ? (
         <div style={{ color: '#6b7280', fontSize: 14 }}>Loading profiles...</div>
       ) : (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
-          gap: 20,
-        }}>
-          {PROVIDERS.map((name) => {
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {providerList.map((name) => {
             const p = profiles[name] || {};
-            const hasData = p.modalities?.length || p.insurances?.length || p.availableDays?.length || p.openSpaces !== undefined;
+            const summary = [
+              p.licensure,
+              p.modalities?.length > 0 ? p.modalities.join(', ') : null,
+              p.availableDays?.length > 0 ? p.availableDays.map((d) => d.slice(0, 3)).join(', ') : null,
+            ].filter(Boolean).join(' · ');
 
             return (
               <div
                 key={name}
+                onClick={() => openEdit(name)}
                 style={{
                   background: '#fff',
                   border: '1px solid #e5e7eb',
-                  borderRadius: 12,
-                  padding: 20,
+                  borderRadius: 10,
+                  padding: '14px 18px',
                   display: 'flex',
-                  flexDirection: 'column',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
                   gap: 12,
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.05)',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
+                  cursor: 'pointer',
+                  transition: 'border-color 0.15s, box-shadow 0.15s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.borderColor = '#a78bfa';
+                  e.currentTarget.style.boxShadow = '0 2px 8px rgba(124,58,237,0.08)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.borderColor = '#e5e7eb';
+                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0,0,0,0.04)';
                 }}
               >
-                {/* Header */}
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 17 }}>{name}</div>
-                    <div style={{ fontSize: 13, color: '#6b7280', marginTop: 2 }}>
-                      {[p.licensure, p.pronouns].filter(Boolean).join(' · ') || 'No profile yet'}
-                    </div>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6 }}>
-                    <OpenSpacesBadge count={p.openSpaces} />
-                    {p.isIntern && (
-                      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#fef3c7', color: '#92400e', fontWeight: 600, border: '1px solid #fde68a' }}>
-                        Intern
-                      </span>
-                    )}
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 15 }}>{name}</div>
+                  <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {summary || 'No profile yet'}
                   </div>
                 </div>
-
-                {hasData ? (
-                  <>
-                    {/* Modalities */}
-                    {p.modalities?.length > 0 && (
-                      <div>
-                        <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Modalities</div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                          {p.modalities.map((m) => <Chip key={m} label={m} />)}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Session format */}
-                    {p.sessionFormats?.length > 0 && (
-                      <div>
-                        <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Format</div>
-                        <div style={{ display: 'flex', gap: 4 }}>
-                          {p.sessionFormats.map((f) => <Chip key={f} label={f} />)}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Availability */}
-                    {p.availableDays?.length > 0 && (
-                      <div>
-                        <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Available</div>
-                        <div style={{ fontSize: 13, color: '#374151' }}>
-                          {p.availableDays.map((d) => d.slice(0, 3)).join(', ')}
-                          {p.availableTimes?.length > 0 && ` · ${p.availableTimes.join(', ')}`}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Insurances */}
-                    {p.insurances?.length > 0 && (
-                      <div>
-                        <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Insurance</div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                          {p.insurances.map((ins) => <Chip key={ins} label={ins} />)}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Client ages */}
-                    {p.clientAges?.length > 0 && (
-                      <div>
-                        <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Client Ages</div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                          {p.clientAges.map((a) => <Chip key={a} label={a} />)}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Specialties */}
-                    {p.specialties?.length > 0 && (
-                      <div>
-                        <div style={{ fontSize: 11, fontWeight: 600, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>Specialties</div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
-                          {p.specialties.slice(0, 6).map((s) => <Chip key={s} label={s} />)}
-                          {p.specialties.length > 6 && (
-                            <Chip label={`+${p.specialties.length - 6} more`} />
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div style={{ fontSize: 13, color: '#9ca3af', fontStyle: 'italic' }}>
-                    No profile data yet. Click Edit to fill in.
-                  </div>
-                )}
-
-                <button
-                  onClick={() => openEdit(name)}
-                  style={{
-                    marginTop: 'auto',
-                    padding: '8px 14px',
-                    borderRadius: 8,
-                    border: '1px solid #d1d5db',
-                    background: '#fff',
-                    color: '#374151',
-                    fontWeight: 600,
-                    fontSize: 13,
-                    cursor: 'pointer',
-                    alignSelf: 'flex-start',
-                  }}
-                >
-                  Edit Profile
-                </button>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                  {p.isIntern && (
+                    <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#fef3c7', color: '#92400e', fontWeight: 600, border: '1px solid #fde68a' }}>
+                      Intern
+                    </span>
+                  )}
+                  <OpenSpacesBadge count={p.openSpaces} />
+                  <span style={{ fontSize: 18, color: '#d1d5db' }}>›</span>
+                </div>
               </div>
             );
           })}
@@ -521,6 +497,25 @@ export default function ProvidersPage() {
                 }}
               >
                 Cancel
+              </button>
+            </div>
+            <div style={{ marginTop: 12, borderTop: '1px solid #fee2e2', paddingTop: 12 }}>
+              <button
+                onClick={() => deleteProvider(editingProvider)}
+                disabled={deletingProvider || saving}
+                style={{
+                  width: '100%',
+                  padding: '8px 0',
+                  borderRadius: 8,
+                  border: '1px solid #fca5a5',
+                  background: '#fff',
+                  color: '#dc2626',
+                  fontWeight: 600,
+                  fontSize: 13,
+                  cursor: deletingProvider || saving ? 'default' : 'pointer',
+                }}
+              >
+                {deletingProvider ? 'Removing…' : 'Remove Provider'}
               </button>
             </div>
           </div>

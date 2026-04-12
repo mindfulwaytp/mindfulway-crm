@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import PROVIDERS from './providers';
 import {
   DragDropContext,
   Droppable,
@@ -61,7 +60,7 @@ function cloneData(data) {
   return JSON.parse(JSON.stringify(data));
 }
 
-function ProviderSelect({ value, onChange, inputStyle }) {
+function ProviderSelect({ value, onChange, inputStyle, providers = [] }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
   const selected = value ? value.split(',').map(s => s.replace(/\s*\(.*?\)/g, '').trim()).filter(Boolean) : [];
@@ -107,7 +106,7 @@ function ProviderSelect({ value, onChange, inputStyle }) {
           onMouseDown={e => e.stopPropagation()}
           style={{ position: 'absolute', top: '110%', left: 0, zIndex: 50, background: '#fff', border: '1px solid #d1d5db', borderRadius: 10, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', padding: '8px 0', minWidth: '100%', maxHeight: 220, overflowY: 'auto' }}
         >
-          {PROVIDERS.map(p => (
+          {providers.map(p => (
             <label
               key={p}
               style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 13, userSelect: 'none' }}
@@ -177,7 +176,7 @@ const blankDraft = {
   },
 };
 
-function NewEntryModal({ onClose, onCreated }) {
+function NewEntryModal({ onClose, onCreated, providers = [] }) {
   const [draft, setDraft] = useState(() => JSON.parse(JSON.stringify(blankDraft)));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -279,11 +278,11 @@ function NewEntryModal({ onClose, onCreated }) {
               </div>
               <div>
                 <label style={labelStyle}>Assigned Provider</label>
-                <ProviderSelect value={draft.pipeline.assignedProvider} onChange={v => update('pipeline.assignedProvider', v)} inputStyle={inputStyle} />
+                <ProviderSelect value={draft.pipeline.assignedProvider} onChange={v => update('pipeline.assignedProvider', v)} inputStyle={inputStyle} providers={providers} />
               </div>
               <div>
                 <label style={labelStyle}>Possible Providers</label>
-                <ProviderSelect value={draft.pipeline.possibleProviders} onChange={v => update('pipeline.possibleProviders', v)} inputStyle={inputStyle} />
+                <ProviderSelect value={draft.pipeline.possibleProviders} onChange={v => update('pipeline.possibleProviders', v)} inputStyle={inputStyle} providers={providers} />
               </div>
               <div style={{ gridColumn: '1 / -1' }}>
                 <label style={labelStyle}>Comments</label>
@@ -325,7 +324,7 @@ function NewEntryModal({ onClose, onCreated }) {
 
               <div style={{ gridColumn: 'span 3' }}>
                 <label style={labelStyle}>Preferred Provider</label>
-                <ProviderSelect value={draft.intake.preferredProvider} onChange={v => update('intake.preferredProvider', v)} inputStyle={inputStyle} />
+                <ProviderSelect value={draft.intake.preferredProvider} onChange={v => update('intake.preferredProvider', v)} inputStyle={inputStyle} providers={providers} />
               </div>
               <div style={{ gridColumn: 'span 3' }}>
                 <label style={labelStyle}>Open to Intern</label>
@@ -452,6 +451,7 @@ function DetailPanel({
   onQuickAssign,
 }) {
   const record = isEditing ? draft : inquiry;
+  const providerNames = (providerProfiles || []).map((p) => p.name).sort();
   const [showMatch, setShowMatch] = useState(false);
   const [matchResults, setMatchResults] = useState([]);
   const [assigning, setAssigning] = useState('');
@@ -859,7 +859,7 @@ function DetailPanel({
               <div>
                 <label style={labelStyle}>Assigned Provider</label>
                 {isEditing ? (
-                  <ProviderSelect value={record.pipeline?.assignedProvider || ''} onChange={v => onChange('pipeline.assignedProvider', v)} inputStyle={inputStyle} />
+                  <ProviderSelect value={record.pipeline?.assignedProvider || ''} onChange={v => onChange('pipeline.assignedProvider', v)} inputStyle={inputStyle} providers={providerNames} />
                 ) : (
                   <div style={readValueStyle}>{record.pipeline?.assignedProvider || '—'}</div>
                 )}
@@ -867,7 +867,7 @@ function DetailPanel({
               <div>
                 <label style={labelStyle}>Possible Providers</label>
                 {isEditing ? (
-                  <ProviderSelect value={record.pipeline?.possibleProviders || ''} onChange={v => onChange('pipeline.possibleProviders', v)} inputStyle={inputStyle} />
+                  <ProviderSelect value={record.pipeline?.possibleProviders || ''} onChange={v => onChange('pipeline.possibleProviders', v)} inputStyle={inputStyle} providers={providerNames} />
                 ) : (
                   <div style={readValueStyle}>{record.pipeline?.possibleProviders || '—'}</div>
                 )}
@@ -970,7 +970,7 @@ function DetailPanel({
               <div style={{ gridColumn: 'span 3' }}>
                 <label style={labelStyle}>Preferred Provider</label>
                 {isEditing ? (
-                  <ProviderSelect value={record.intake?.preferredProvider || ''} onChange={v => onChange('intake.preferredProvider', v)} inputStyle={inputStyle} />
+                  <ProviderSelect value={record.intake?.preferredProvider || ''} onChange={v => onChange('intake.preferredProvider', v)} inputStyle={inputStyle} providers={providerNames} />
                 ) : (
                   <div style={readValueStyle}>{record.intake?.preferredProvider || '—'}</div>
                 )}
@@ -2146,6 +2146,7 @@ export default function App() {
               setIntakes(rows);
               setShowNewEntry(false);
             }}
+            providers={providerProfiles.map((p) => p.name).sort()}
           />
         ) : null}
 

@@ -2,6 +2,7 @@ import {
   collection,
   getDocs,
   setDoc,
+  deleteDoc,
   doc,
   serverTimestamp,
 } from 'firebase/firestore';
@@ -17,4 +18,9 @@ export async function fetchProviderProfiles() {
 export async function upsertProviderProfile(name, data) {
   const ref = doc(db, 'providers', name);
   await setDoc(ref, { ...data, name, updatedAt: serverTimestamp() }, { merge: true });
+}
+
+export async function deleteProviderProfile(name) {
+  const ref = doc(db, 'providers', name);
+  await deleteDoc(ref);
 }

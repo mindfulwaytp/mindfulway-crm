@@ -27,6 +27,7 @@ export const SPECIALTIES = [
   'Stress Management',
   'Self-Esteem',
   'Parenting Issues',
+  'Problems at School',
   'Suicidality/Self-Harm',
 ];
 
@@ -81,7 +82,6 @@ const CHECKLIST_MAP = [
   ['borderline',      'Personality Disorders'],
   ['bpd',             'Personality Disorders'],
   ['life transition', 'Life Transitions'],
-  ['transition',      'Life Transitions'],
   ['stress',          'Stress Management'],
   ['burnout',         'Stress Management'],
   ['self-esteem',     'Self-Esteem'],
@@ -92,6 +92,7 @@ const CHECKLIST_MAP = [
   ['self-harm',       'Suicidality/Self-Harm'],
   ['self harm',       'Suicidality/Self-Harm'],
   ['cutting',         'Suicidality/Self-Harm'],
+  ['school',         'Problems at School']
 ];
 
 /**

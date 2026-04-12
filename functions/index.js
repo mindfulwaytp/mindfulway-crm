@@ -1,6 +1,5 @@
 import { onRequest } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
-import PROVIDERS from "./providers.js";
 import { logger } from "firebase-functions";
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
@@ -63,9 +62,12 @@ export const jotformWebhook = onRequest(async (req, res) => {
     const lastName = raw.q3_clientLegal?.last || "";
     const clientName = `${firstName} ${lastName}`.trim();
 
+    const providerSnap = await db.collection("providers").get();
+    const providerNames = providerSnap.docs.map((d) => d.id);
+
     const preferredProviders = Array.isArray(raw.q7_pleaseIndicate)
-      ? raw.q7_pleaseIndicate.map(matchProvider).join(", ")
-      : matchProvider(raw.q7_pleaseIndicate);
+      ? raw.q7_pleaseIndicate.map((v) => matchProvider(v, providerNames)).join(", ")
+      : matchProvider(raw.q7_pleaseIndicate, providerNames);
 
     const servicesRequested = Array.isArray(raw.q10_whatType)
       ? raw.q10_whatType.join(", ")
@@ -238,12 +240,12 @@ export const sheetIntake = onRequest({ secrets: [intakeToken], invoker: "public"
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-function matchProvider(raw) {
+function matchProvider(raw, providerNames = []) {
   if (!raw) return "";
   // Strip parenthetical suffixes like " (Intern)" before matching
   const cleaned = raw.replace(/\s*\(.*?\)/g, "").trim();
   const lower = cleaned.toLowerCase();
-  const match = PROVIDERS.find(p => lower.includes(p.toLowerCase()));
+  const match = providerNames.find(p => lower.includes(p.toLowerCase()));
   return match || raw;
 }
 
