@@ -14,7 +14,8 @@ const PROVIDERS = [
   "Justin",
   "Michelle",
   "Heley",
-  "Julia"
+  "Julia",
+  "Erica"
 ];
 
 export default PROVIDERS;
