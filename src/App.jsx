@@ -1186,8 +1186,12 @@ export default function App() {
 }
 
 function ProviderApp({ showHours = false }) {
+  const { isIntern, isSupervisor } = useAuth();
   const [page, setPage] = useState('availability');
-  if (showHours && page === 'hours') return <MyHoursPage onNav={setPage} />;
+  if (showHours && page === 'hours') {
+    if (isIntern) return <MyHoursPage onNav={setPage} />;
+    if (isSupervisor) return <InternHoursPage onNav={setPage} />;
+  }
   return <AvailabilityPage onNav={showHours ? setPage : undefined} />;
 }
 

@@ -5,6 +5,8 @@ import {
   HOUR_TYPES, fetchHourEntries, addHourEntry, submitChangeRequest,
   getMondayOf, formatWeekLabel, entriesInWeek, sumByType,
 } from '../lib/hourEntriesApi';
+import HourEntryModal from '../components/HourEntryModal';
+import NotificationBell from '../components/NotificationBell';
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -21,65 +23,6 @@ function ProgressBar({ logged, required, color, bg }) {
         <div style={{ width: `${pct}%`, height: '100%', borderRadius: 4, background: over ? '#10b981' : (color || '#7c3aed'), transition: 'width 0.3s' }} />
       </div>
     </div>
-  );
-}
-
-function AddEntryModal({ onClose, onSave }) {
-  const today = new Date().toISOString().split('T')[0];
-  const [form, setForm] = useState({ date: today, type: 'direct_contact', hours: '', notes: '' });
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
-
-  function set(k, v) { setForm((f) => ({ ...f, [k]: v })); }
-
-  async function handleSubmit(e) {
-    e.preventDefault();
-    if (!form.hours || Number(form.hours) <= 0) { setError('Please enter a valid number of hours.'); return; }
-    setSaving(true);
-    try {
-      await onSave(form);
-      onClose();
-    } catch (err) {
-      setError(err.message || 'Failed to save entry.');
-      setSaving(false);
-    }
-  }
-
-  return (
-    <Overlay onClose={onClose}>
-      <h2 style={{ margin: '0 0 20px', fontSize: 18, fontWeight: 700 }}>Add Hours Entry</h2>
-      <form onSubmit={handleSubmit}>
-        <FormField label="Date">
-          <input type="date" value={form.date} onChange={(e) => set('date', e.target.value)} required style={inputStyle} />
-        </FormField>
-        <FormField label="Type">
-          <select value={form.type} onChange={(e) => set('type', e.target.value)} style={inputStyle}>
-            {HOUR_TYPES.map(({ key, label }) => (
-              <option key={key} value={key}>{label}</option>
-            ))}
-          </select>
-        </FormField>
-        <FormField label="Hours">
-          <input
-            type="number" min={0.5} step={0.5}
-            value={form.hours} onChange={(e) => set('hours', e.target.value)}
-            placeholder="e.g. 1.5" required style={inputStyle}
-          />
-        </FormField>
-        <FormField label="Notes (optional)">
-          <textarea
-            value={form.notes} onChange={(e) => set('notes', e.target.value)}
-            rows={3} placeholder="Any additional context…"
-            style={{ ...inputStyle, resize: 'vertical' }}
-          />
-        </FormField>
-        {error && <div style={{ color: '#dc2626', fontSize: 13, marginBottom: 12 }}>{error}</div>}
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <button type="button" onClick={onClose} style={cancelBtnStyle}>Cancel</button>
-          <button type="submit" disabled={saving} style={primaryBtnStyle}>{saving ? 'Saving…' : 'Save Entry'}</button>
-        </div>
-      </form>
-    </Overlay>
   );
 }
 
@@ -202,6 +145,7 @@ export default function MyHoursPage({ onNav }) {
           )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <NotificationBell providerName={providerName} />
           <span style={{ fontSize: 13, color: '#6b7280' }}>{user?.email}</span>
           <button onClick={signOut} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', fontSize: 13, cursor: 'pointer', color: '#374151' }}>
             Sign out
@@ -317,7 +261,7 @@ export default function MyHoursPage({ onNav }) {
       </div>
 
       {showAddModal && (
-        <AddEntryModal onClose={() => setShowAddModal(false)} onSave={handleAddEntry} />
+        <HourEntryModal onClose={() => setShowAddModal(false)} onSave={handleAddEntry} />
       )}
       {changeEntry && (
         <ChangeRequestModal entry={changeEntry} onClose={() => setChangeEntry(null)} onSubmit={handleChangeRequest} />

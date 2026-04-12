@@ -58,12 +58,19 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // ── Hour entries — intern creates own; admin/supervisor read all ─────────
+    // ── Hour entries ─────────────────────────────────────────────────────────
+    // - Intern: read/create own
+    // - Admin: full access
+    // - Supervisor: read/create for assigned interns only
     match /hourEntries/{entryId} {
-      allow read: if isAdmin() || isSupervisor() ||
-        (isSignedIn() && getUserData().providerName == resource.data.internName);
-      allow create: if isSignedIn() &&
-        getUserData().providerName == request.resource.data.internName;
+      allow read: if isAdmin() ||
+        (isSignedIn() && getUserData().providerName == resource.data.internName) ||
+        (hasRole('supervisor') &&
+          get(/databases/$(database)/documents/internProfiles/$(resource.data.internName)).data.supervisorName == getUserData().providerName);
+      allow create: if isAdmin() ||
+        (isSignedIn() && getUserData().providerName == request.resource.data.internName) ||
+        (hasRole('supervisor') &&
+          get(/databases/$(database)/documents/internProfiles/$(request.resource.data.internName)).data.supervisorName == getUserData().providerName);
       allow update, delete: if isAdmin();
     }
 
@@ -96,6 +103,19 @@ service cloud.firestore {
     match /config/{docId} {
       allow read: if isSignedIn();
       allow write: if false;
+    }
+
+    // ── Notifications ────────────────────────────────────────────────────────
+    // - Recipient: read/update (mark read) own
+    // - Admin/supervisor: create
+    // - Admin: delete
+    match /notifications/{notifId} {
+      allow read: if isAdmin() ||
+        (isSignedIn() && resource.data.recipientProviderName == getUserData().providerName);
+      allow create: if isAdmin() || hasRole('supervisor');
+      allow update: if isSignedIn() &&
+        resource.data.recipientProviderName == getUserData().providerName;
+      allow delete: if isAdmin();
     }
   }
 }

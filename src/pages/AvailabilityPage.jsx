@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../lib/AuthContext';
 import { fetchProviderProfiles, upsertProviderProfile } from '../lib/providersProfileApi';
+import NotificationBell from '../components/NotificationBell';
 
 const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 const TIMES = ['Morning', 'Afternoon', 'Evening'];
@@ -18,8 +19,9 @@ function SaveIndicator({ state }) {
 }
 
 export default function AvailabilityPage({ onNav }) {
-  const { isAdmin, providerName, user, signOut } = useAuth();
+  const { isAdmin, isIntern, isSupervisor, providerName, user, signOut } = useAuth();
   const showNavTabs = !!onNav;
+  const hoursTabLabel = isIntern ? 'My Hours' : isSupervisor ? 'Intern Hours' : 'Hours';
 
   const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -84,7 +86,7 @@ export default function AvailabilityPage({ onNav }) {
           {showNavTabs ? (
             <div style={{ display: 'flex', gap: 4, background: '#f3f4f6', borderRadius: 8, padding: 3 }}>
               <button style={tabStyle(true)}>My Availability</button>
-              <button onClick={() => onNav('hours')} style={tabStyle(false)}>My Hours</button>
+              <button onClick={() => onNav('hours')} style={tabStyle(false)}>{hoursTabLabel}</button>
             </div>
           ) : (
             <span style={{ fontSize: 13, color: '#6b7280', fontWeight: 500 }}>
@@ -93,6 +95,7 @@ export default function AvailabilityPage({ onNav }) {
           )}
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {showNavTabs && <NotificationBell providerName={providerName} />}
           <span style={{ fontSize: 13, color: '#6b7280' }}>{user?.email}</span>
           <button
             onClick={signOut}

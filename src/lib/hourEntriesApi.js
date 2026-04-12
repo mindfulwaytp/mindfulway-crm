@@ -13,7 +13,7 @@ export const HOUR_TYPES = [
 
 // ── Entries ───────────────────────────────────────────────────────────────────
 
-export async function addHourEntry({ internName, date, type, hours, notes }) {
+export async function addHourEntry({ internName, date, type, hours, notes, createdBy = null }) {
   return addDoc(collection(db, 'hourEntries'), {
     internName,
     date: Timestamp.fromDate(new Date(date)),
@@ -21,6 +21,7 @@ export async function addHourEntry({ internName, date, type, hours, notes }) {
     hours: Number(hours),
     notes: notes || '',
     createdAt: Timestamp.now(),
+    ...(createdBy ? { createdBy } : {}),
   });
 }
 

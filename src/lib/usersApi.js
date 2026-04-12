@@ -14,32 +14,41 @@ import { db } from './firebase';
  * Legacy docs with { role: string } are normalized to { roles: [string] }.
  */
 export async function getOrCreateUserRole(uid, email) {
-  // 1. Check for existing user doc
   const userRef = doc(db, 'users', uid);
   const userSnap = await getDoc(userRef);
-  if (userSnap.exists()) {
-    const data = userSnap.data();
-    // Normalize legacy single-role docs
-    if (data.role && !data.roles) {
-      return { ...data, roles: [data.role] };
-    }
-    return data;
-  }
+  const existing = userSnap.exists() ? userSnap.data() : null;
 
-  // 2. Check if this email matches a provider's email field
+  // For users tied to a provider, always re-sync roles from the provider doc.
+  // This way, role changes on the Providers page propagate on next sign-in
+  // instead of being permanently cached at signup time.
   const providersSnap = await getDocs(collection(db, 'providers'));
   const matchingProvider = providersSnap.docs.find(
     (d) => d.data().email === email
   );
   if (matchingProvider) {
     const providerData = matchingProvider.data();
-    // Use roles from the provider profile if set, otherwise default to ['provider']
     const roles = Array.isArray(providerData.roles) && providerData.roles.length > 0
       ? providerData.roles
       : ['provider'];
     const userData = { email, roles, providerName: matchingProvider.id };
-    await setDoc(userRef, userData);
+    const existingRoles = existing?.roles || (existing?.role ? [existing.role] : []);
+    const rolesChanged =
+      !existing ||
+      existing.providerName !== matchingProvider.id ||
+      existingRoles.length !== roles.length ||
+      existingRoles.some((r) => !roles.includes(r));
+    if (rolesChanged) {
+      await setDoc(userRef, userData, { merge: true });
+    }
     return userData;
+  }
+
+  // No matching provider — fall back to existing user doc if present
+  if (existing) {
+    if (existing.role && !existing.roles) {
+      return { ...existing, roles: [existing.role] };
+    }
+    return existing;
   }
 
   // 3. Check config/admins for admin email list
