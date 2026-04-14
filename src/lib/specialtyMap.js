@@ -28,7 +28,10 @@ export const SPECIALTIES = [
   'Self-Esteem',
   'Parenting Issues',
   'Problems at School',
+  'Problems at Work',
   'Suicidality/Self-Harm',
+  'Polyamory/Non-Monogamy',
+  'Sexual Functioning',
 ];
 
 /**
@@ -92,7 +95,15 @@ const CHECKLIST_MAP = [
   ['self-harm',       'Suicidality/Self-Harm'],
   ['self harm',       'Suicidality/Self-Harm'],
   ['cutting',         'Suicidality/Self-Harm'],
-  ['school',         'Problems at School']
+  ['school',         'Problems at School'],
+  ['work',           'Problems at Work'],
+  ['work stress',    'Problems at Work'],
+  ['work problems',   'Problems at Work'],
+  ['problems at work',   'Problems at Work'],
+  ['polyamory',      'Polyamory/Non-Monogamy'],
+  ['non-monogamy',   'Polyamory/Non-Monogamy'],
+  ['sexual',         'Sexual Functioning'],
+  ['sexuality',       'Sexual Functioning'],
 ];
 
 /**

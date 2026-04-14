@@ -457,16 +457,12 @@ function DetailPanel({
 }) {
   const record = isEditing ? draft : inquiry;
   const providerNames = (providerProfiles || []).map((p) => p.name).sort();
-  const [showMatch, setShowMatch] = useState(false);
-  const [matchResults, setMatchResults] = useState([]);
+  const matchResults = useMemo(
+    () => (providerProfiles && providerProfiles.length > 0 ? matchProviders(inquiry, providerProfiles) : []),
+    [inquiry, providerProfiles]
+  );
   const [assigning, setAssigning] = useState('');
   const [expandedRows, setExpandedRows] = useState(new Set());
-
-  function runMatch() {
-    const results = matchProviders(inquiry, providerProfiles || []);
-    setMatchResults(results);
-    setShowMatch(true);
-  }
 
   async function handleAssign(name) {
     setAssigning(name);
@@ -578,21 +574,6 @@ function DetailPanel({
               >
                 Edit
               </button>
-              <button
-                onClick={showMatch ? () => setShowMatch(false) : runMatch}
-                disabled={!providerProfiles || providerProfiles.length === 0}
-                style={{
-                  border: '1px solid #7c3aed',
-                  background: showMatch ? '#7c3aed' : '#ede9fe',
-                  color: showMatch ? '#fff' : '#6d28d9',
-                  borderRadius: 10,
-                  padding: '8px 14px',
-                  cursor: 'pointer',
-                  fontWeight: 600,
-                }}
-              >
-                {showMatch ? 'Hide Match' : 'Find Match'}
-              </button>
             </>
           ) : (
             <>
@@ -631,8 +612,8 @@ function DetailPanel({
           )}
         </div>
 
-        {/* ── Find Match Results ───────────────────────────────────────── */}
-        {showMatch && (() => {
+        {/* ── Provider Match Results ───────────────────────────────────── */}
+        {(() => {
           const preferredNames = (inquiry.intake?.preferredProvider || '')
             .split(',')
             .map(s => s.replace(/\s*\(.*?\)/g, '').trim())
