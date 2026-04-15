@@ -72,12 +72,26 @@ function normalizeInternValue(v) {
   return '';
 }
 
+/** Convert a Firestore Timestamp, cached plain {seconds,nanoseconds} object, Date, or string to a JS Date. */
+function toJsDate(value) {
+  if (!value) return null;
+  if (typeof value.toDate === 'function') return value.toDate(); // Firestore Timestamp
+  if (typeof value.seconds === 'number') return new Date(value.seconds * 1000); // cached plain object
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+/** Convert a Firestore Timestamp or cached plain object to milliseconds. */
+function toMs(value) {
+  if (!value) return 0;
+  if (typeof value.toMillis === 'function') return value.toMillis();
+  if (typeof value.seconds === 'number') return value.seconds * 1000;
+  const ms = new Date(value).getTime();
+  return Number.isNaN(ms) ? 0 : ms;
+}
+
 function formatDate(value) {
   if (!value) return '—';
-
-  if (typeof value?.toDate === 'function') {
-    return value.toDate().toLocaleDateString();
-  }
 
   // YYYY-MM-DD strings are parsed as UTC midnight by new Date(), causing an
   // off-by-one day in local timezones. Parse as local time instead.
@@ -86,8 +100,8 @@ function formatDate(value) {
     return new Date(y, m - 1, d).toLocaleDateString();
   }
 
-  const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return '—';
+  const d = toJsDate(value);
+  if (!d) return '—';
   return d.toLocaleDateString();
 }
 
@@ -1175,6 +1189,10 @@ export default function App() {
   const [providerProfiles, setProviderProfiles] = useState([]);
   const [intakesLoading, setIntakesLoading] = useState(true);
   const [intakesError, setIntakesError] = useState('');
+  const [intakesLastSyncedAt, setIntakesLastSyncedAt] = useState(() => {
+    const cache = loadIntakesCache();
+    return cache?.lastSyncedAt ?? null;
+  });
 
   useEffect(() => {
     if (!isAdmin || !user) return;
@@ -1187,14 +1205,18 @@ export default function App() {
           const changed = await fetchInquiriesSince(cache.lastSyncedAt);
           if (changed.length > 0) {
             const merged = mergeIntakes(cache.inquiries, changed);
+            const now = Date.now();
             setIntakes(merged);
-            saveIntakesCache(merged, Date.now());
+            setIntakesLastSyncedAt(now);
+            saveIntakesCache(merged, now);
           }
         } else {
           const data = await fetchInquiries();
+          const now = Date.now();
           setIntakes(data);
           setIntakesLoading(false);
-          saveIntakesCache(data, Date.now());
+          setIntakesLastSyncedAt(now);
+          saveIntakesCache(data, now);
         }
       } catch (err) {
         setIntakesError(err.message || 'Failed to load intakes');
@@ -1206,6 +1228,27 @@ export default function App() {
       .then(setProviderProfiles)
       .catch((err) => console.error('Failed to load provider profiles', err));
   }, [isAdmin, user]);
+
+  async function refreshIntakes() {
+    try {
+      const cache = loadIntakesCache();
+      const since = cache?.lastSyncedAt ?? 0;
+      const changed = await fetchInquiriesSince(since);
+      const now = Date.now();
+      if (changed.length > 0) {
+        const base = cache?.inquiries ?? [];
+        const merged = mergeIntakes(base, changed);
+        setIntakes(merged);
+        saveIntakesCache(merged, now);
+      } else {
+        // Even if no changes, update the lastSyncedAt so timestamp reflects the check
+        if (cache) saveIntakesCache(cache.inquiries, now);
+      }
+      setIntakesLastSyncedAt(now);
+    } catch (err) {
+      console.error('Refresh failed:', err);
+    }
+  }
 
   // Auth gate — must resolve before rendering anything
   if (authLoading) {
@@ -1234,6 +1277,8 @@ export default function App() {
             setProviderProfiles={setProviderProfiles}
             loading={intakesLoading}
             error={intakesError}
+            lastSyncedAt={intakesLastSyncedAt}
+            onRefresh={refreshIntakes}
           />
         } />
       </Routes>
@@ -1277,7 +1322,7 @@ function AvailabilityWithNav() {
   return <AvailabilityPage onNav={() => navigate('/hours')} />;
 }
 
-function AdminApp({ signOut, intakes, setIntakes, providerProfiles, setProviderProfiles, loading, error }) {
+function AdminApp({ signOut, intakes, setIntakes, providerProfiles, setProviderProfiles, loading, error, lastSyncedAt, onRefresh }) {
   const [updatingId, setUpdatingId] = useState('');
   const location = useLocation();
   const navigate = useNavigate();
@@ -1488,8 +1533,8 @@ function AdminApp({ signOut, intakes, setIntakes, providerProfiles, setProviderP
 
   const filteredInquiries = useMemo(() => {
     let rows = [...intakes].sort((a, b) => {
-      const aTime = a.createdAt?.toMillis?.() || 0;
-      const bTime = b.createdAt?.toMillis?.() || 0;
+      const aTime = toMs(a.createdAt);
+      const bTime = toMs(b.createdAt);
       return bTime - aTime;
     });
 
@@ -1776,11 +1821,26 @@ function AdminApp({ signOut, intakes, setIntakes, providerProfiles, setProviderP
           {view === 'active' ? (
             <>
               <div style={{ position: 'sticky', top: 0, zIndex: 10, background: '#f7f7f8', paddingBottom: 12, marginBottom: 8 }}>
-                <div style={{ paddingBottom: 8 }}>
-                  <h1 style={{ margin: 0, fontSize: 32 }}>Active Pipeline</h1>
-                  <p style={{ marginTop: 4, marginBottom: 0, color: '#6b7280' }}>
-                    Manage current outreach, scheduling, and waitlist activity.
-                  </p>
+                <div style={{ paddingBottom: 8, display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                  <div>
+                    <h1 style={{ margin: 0, fontSize: 32 }}>Active Pipeline</h1>
+                    <p style={{ marginTop: 4, marginBottom: 0, color: '#6b7280' }}>
+                      Manage current outreach, scheduling, and waitlist activity.
+                    </p>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, paddingTop: 6, flexShrink: 0 }}>
+                    <button
+                      onClick={onRefresh}
+                      style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', fontSize: 13, cursor: 'pointer', color: '#374151' }}
+                    >
+                      Refresh
+                    </button>
+                    {lastSyncedAt && (
+                      <span style={{ fontSize: 11, color: '#9ca3af' }}>
+                        Last updated {new Date(lastSyncedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
               {/* Pipeline filters */}
@@ -1937,8 +1997,8 @@ function AdminApp({ signOut, intakes, setIntakes, providerProfiles, setProviderP
                         if (sort === 'az') {
                           return (a.intake?.clientName || '').localeCompare(b.intake?.clientName || '');
                         }
-                        const aTime = a.createdAt?.toMillis?.() ?? (a.createdAt ? new Date(a.createdAt).getTime() : 0);
-                        const bTime = b.createdAt?.toMillis?.() ?? (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+                        const aTime = toMs(a.createdAt);
+                        const bTime = toMs(b.createdAt);
                         return sort === 'date-asc' ? aTime - bTime : bTime - aTime;
                       });
                       const isCollapsed = collapsedColumns[column.id];
@@ -2070,9 +2130,7 @@ function AdminApp({ signOut, intakes, setIntakes, providerProfiles, setProviderP
                                       key={card.id}
                                     >
                                       {(providedDraggable, snapshotDraggable) => {
-                                        const createdDate = card.createdAt?.toDate
-                                          ? card.createdAt.toDate()
-                                          : card.createdAt ? new Date(card.createdAt) : null;
+                                        const createdDate = toJsDate(card.createdAt);
                                         const refDate = card.pipeline?.lastContactDate
                                           ? new Date(card.pipeline.lastContactDate)
                                           : createdDate;
