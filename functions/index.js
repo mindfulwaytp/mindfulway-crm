@@ -252,14 +252,14 @@ const CATEGORY_LABELS = {
 export const onNewIntranetPost = onDocumentCreated("intranet_posts/{postId}", async (event) => {
   const post = event.data.data();
   const postId = event.params.postId;
-  const { authorName, authorUid, content, category } = post;
+  const { authorName, content, category } = post;
 
   const categoryLabel = CATEGORY_LABELS[category] || category;
   const preview = content.length > 120 ? content.slice(0, 120) + "…" : content;
 
   // Get all Auth users to access their emails
   const listResult = await getAuth().listUsers();
-  const recipients = listResult.users.filter((u) => u.uid !== authorUid && u.email);
+  const recipients = listResult.users.filter((u) => u.email);
 
   // Get Firestore user docs to resolve providerName for in-app notifications
   const userDocs = await db.collection("users").get();
