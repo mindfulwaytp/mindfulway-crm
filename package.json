@@ -1,5 +1,5 @@
 {
-  "name": "mindfulway-crm",
+  "name": "mindfulway-os",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -17,7 +17,8 @@
     "firebase": "^12.10.0",
     "node-fetch": "^3.3.2",
     "react": "^19.2.4",
-    "react-dom": "^19.2.4"
+    "react-dom": "^19.2.4",
+    "react-router-dom": "^7.14.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.4",

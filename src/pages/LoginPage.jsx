@@ -43,7 +43,7 @@ export default function LoginPage({ accessDenied, userEmail }) {
       }}>
         <div style={{ marginBottom: 32 }}>
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: '#111827' }}>
-            Mindful Way CRM
+            MindfulWayOS
           </h1>
           <p style={{ marginTop: 8, fontSize: 14, color: '#6b7280' }}>
             Sign in with your Mindful Way Google account to continue.

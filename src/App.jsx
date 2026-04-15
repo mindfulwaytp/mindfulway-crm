@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import HubPage from './pages/HubPage';
+import IntranetPage from './pages/IntranetPage';
 import {
   DragDropContext,
   Droppable,
@@ -1153,27 +1156,45 @@ export default function App() {
     return <LoginPage accessDenied={accessDenied} userEmail={user?.email} />;
   }
 
-  // Admin gets full CRM
-  if (isAdmin) return <AdminApp signOut={signOut} />;
+  if (isAdmin) {
+    return (
+      <Routes>
+        <Route path="/" element={<HubPage />} />
+        {/* All admin app paths handled by AdminApp — single instance preserves state */}
+        <Route path="/*" element={<AdminApp signOut={signOut} />} />
+      </Routes>
+    );
+  }
 
-  // Interns and supervisors get availability + hours with tab nav
-  if (isIntern || isSupervisor) return <ProviderApp showHours />;
+  if (isIntern || isSupervisor) {
+    return (
+      <Routes>
+        <Route path="/" element={<HubPage />} />
+        <Route path="/intranet" element={<IntranetPage />} />
+        <Route path="/availability" element={<AvailabilityWithNav />} />
+        <Route path="/hours" element={isIntern ? <MyHoursPage /> : <InternHoursPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    );
+  }
 
-  // Regular providers get availability only
-  if (isProvider) return <ProviderApp />;
+  if (isProvider) {
+    return (
+      <Routes>
+        <Route path="/" element={<HubPage />} />
+        <Route path="/intranet" element={<IntranetPage />} />
+        <Route path="/availability" element={<AvailabilityPage />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    );
+  }
 
-  // Fallback — shouldn't reach here but show access denied if roles are empty
   return <LoginPage accessDenied userEmail={user?.email} />;
 }
 
-function ProviderApp({ showHours = false }) {
-  const { isIntern, isSupervisor } = useAuth();
-  const [page, setPage] = useState('availability');
-  if (showHours && page === 'hours') {
-    if (isIntern) return <MyHoursPage onNav={setPage} />;
-    if (isSupervisor) return <InternHoursPage onNav={setPage} />;
-  }
-  return <AvailabilityPage onNav={showHours ? setPage : undefined} />;
+function AvailabilityWithNav() {
+  const navigate = useNavigate();
+  return <AvailabilityPage onNav={() => navigate('/hours')} />;
 }
 
 function AdminApp({ signOut }) {
@@ -1182,7 +1203,21 @@ function AdminApp({ signOut }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [updatingId, setUpdatingId] = useState('');
-  const [view, setView] = useState('active');
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const view = useMemo(() => {
+    const p = location.pathname;
+    if (p === '/crm' || p === '/crm/active') return 'active';
+    if (p === '/crm/all') return 'all';
+    if (p === '/providers') return 'providers';
+    if (p === '/availability') return 'availability';
+    if (p === '/hours') return 'intern-hours';
+    if (p === '/intranet') return 'intranet';
+    return 'active';
+  }, [location.pathname]);
+
+  const crmOpen = view === 'active' || view === 'all';
   const [selectedInquiry, setSelectedInquiry] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [draftInquiry, setDraftInquiry] = useState(null);
@@ -1467,48 +1502,118 @@ function AdminApp({ signOut }) {
       >
         <div style={{ marginBottom: 32 }}>
           <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>
-            Mindful Way CRM
+            MindfulWayOS
           </h2>
           <p style={{ marginTop: 6, fontSize: 13, color: '#6b7280' }}>
-            Intake pipeline
+            Internal Staff Portal
           </p>
         </div>
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {/* Hub link */}
           <button
-            onClick={() => setView('active')}
+            onClick={() => navigate('/')}
             style={{
               textAlign: 'left',
-              padding: '12px 14px',
+              padding: '10px 14px',
               borderRadius: 10,
-              border: '1px solid',
-              borderColor: view === 'active' ? '#c4b5fd' : '#e5e7eb',
-              background: view === 'active' ? '#f5f3ff' : '#fff',
+              border: '1px solid #e5e7eb',
+              background: '#fff',
               fontWeight: 600,
               cursor: 'pointer',
+              fontSize: 13,
+              color: '#6b7280',
             }}
           >
-            Active
+            ← Hub
           </button>
 
-          <button
-            onClick={() => setView('all')}
-            style={{
-              textAlign: 'left',
-              padding: '12px 14px',
-              borderRadius: 10,
-              border: '1px solid',
-              borderColor: view === 'all' ? '#c4b5fd' : '#e5e7eb',
-              background: view === 'all' ? '#f5f3ff' : '#fff',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            All Inquiries
-          </button>
+          {/* CRM section with hamburger toggle */}
+          <div>
+            <div style={{ display: 'flex', gap: 6 }}>
+              <button
+                onClick={() => navigate('/crm')}
+                style={{
+                  flex: 1,
+                  textAlign: 'left',
+                  padding: '12px 14px',
+                  borderRadius: 10,
+                  border: '1px solid',
+                  borderColor: crmOpen ? '#c4b5fd' : '#e5e7eb',
+                  background: crmOpen ? '#f5f3ff' : '#fff',
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <span>CRM</span>
+                <span style={{ display: 'flex', flexDirection: 'column', gap: 3, opacity: 0.5 }}>
+                  <span style={{ display: 'block', width: 16, height: 2, background: 'currentColor', borderRadius: 2 }} />
+                  <span style={{ display: 'block', width: 16, height: 2, background: 'currentColor', borderRadius: 2 }} />
+                  <span style={{ display: 'block', width: 16, height: 2, background: 'currentColor', borderRadius: 2 }} />
+                </span>
+              </button>
+              <button
+                onClick={() => setShowNewEntry(true)}
+                title="New Entry"
+                style={{
+                  padding: '0 12px',
+                  borderRadius: 10,
+                  border: '1px solid #009029',
+                  background: '#009029',
+                  color: '#fff',
+                  fontWeight: 700,
+                  fontSize: 18,
+                  cursor: 'pointer',
+                  lineHeight: 1,
+                }}
+              >
+                +
+              </button>
+            </div>
+
+            {crmOpen && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4, paddingLeft: 12 }}>
+                <button
+                  onClick={() => navigate('/crm')}
+                  style={{
+                    textAlign: 'left',
+                    padding: '9px 14px',
+                    borderRadius: 8,
+                    border: '1px solid',
+                    borderColor: view === 'active' ? '#c4b5fd' : '#e5e7eb',
+                    background: view === 'active' ? '#ede9fe' : '#fafafa',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    fontSize: 13,
+                  }}
+                >
+                  Active
+                </button>
+                <button
+                  onClick={() => navigate('/crm/all')}
+                  style={{
+                    textAlign: 'left',
+                    padding: '9px 14px',
+                    borderRadius: 8,
+                    border: '1px solid',
+                    borderColor: view === 'all' ? '#c4b5fd' : '#e5e7eb',
+                    background: view === 'all' ? '#ede9fe' : '#fafafa',
+                    fontWeight: 600,
+                    cursor: 'pointer',
+                    fontSize: 13,
+                  }}
+                >
+                  All Inquiries
+                </button>
+              </div>
+            )}
+          </div>
 
           <button
-            onClick={() => setView('providers')}
+            onClick={() => navigate('/providers')}
             style={{
               textAlign: 'left',
               padding: '12px 14px',
@@ -1524,7 +1629,7 @@ function AdminApp({ signOut }) {
           </button>
 
           <button
-            onClick={() => setView('availability')}
+            onClick={() => navigate('/availability')}
             style={{
               textAlign: 'left',
               padding: '12px 14px',
@@ -1540,7 +1645,7 @@ function AdminApp({ signOut }) {
           </button>
 
           <button
-            onClick={() => setView('intern-hours')}
+            onClick={() => navigate('/hours')}
             style={{
               textAlign: 'left',
               padding: '12px 14px',
@@ -1556,20 +1661,19 @@ function AdminApp({ signOut }) {
           </button>
 
           <button
-            onClick={() => setShowNewEntry(true)}
+            onClick={() => navigate('/intranet')}
             style={{
               textAlign: 'left',
               padding: '12px 14px',
               borderRadius: 10,
-              border: '1px solid #009029',
-              background: '#009029',
-              color: '#fff',
+              border: '1px solid',
+              borderColor: view === 'intranet' ? '#c4b5fd' : '#e5e7eb',
+              background: view === 'intranet' ? '#f5f3ff' : '#fff',
               fontWeight: 600,
               cursor: 'pointer',
-              marginTop: 12,
             }}
           >
-            + New Entry
+            Intranet
           </button>
 
           <button
@@ -1598,6 +1702,8 @@ function AdminApp({ signOut }) {
           <AvailabilityPage />
         ) : view === 'intern-hours' ? (
           <InternHoursPage />
+        ) : view === 'intranet' ? (
+          <IntranetPage embedded />
         ) : (
         <main style={{ padding: 32, overflowX: 'clip', minWidth: 0 }}>
           {error ? (

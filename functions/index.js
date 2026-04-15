@@ -1,8 +1,10 @@
 import { onRequest } from "firebase-functions/v2/https";
+import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { defineSecret } from "firebase-functions/params";
 import { logger } from "firebase-functions";
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { getAuth } from "firebase-admin/auth";
 import Busboy from "busboy";
 
 const intakeToken = defineSecret("INTAKE_TOKEN");
@@ -237,6 +239,82 @@ export const sheetIntake = onRequest({ secrets: [intakeToken], invoker: "public"
     return res.status(500).send("Intake failed");
   }
 });
+
+// ── Intranet post notifications ───────────────────────────────────────────────
+
+const CATEGORY_LABELS = {
+  general: "General",
+  announcement: "Announcement",
+  celebration: "Celebration",
+  update: "Update",
+};
+
+export const onNewIntranetPost = onDocumentCreated("intranet_posts/{postId}", async (event) => {
+  const post = event.data.data();
+  const postId = event.params.postId;
+  const { authorName, authorUid, content, category } = post;
+
+  const categoryLabel = CATEGORY_LABELS[category] || category;
+  const preview = content.length > 120 ? content.slice(0, 120) + "…" : content;
+
+  // Get all Auth users to access their emails
+  const listResult = await getAuth().listUsers();
+  const recipients = listResult.users.filter((u) => u.uid !== authorUid && u.email);
+
+  // Get Firestore user docs to resolve providerName for in-app notifications
+  const userDocs = await db.collection("users").get();
+  const userDataMap = {};
+  userDocs.forEach((d) => { userDataMap[d.id] = d.data(); });
+
+  const writes = recipients.map((user) => {
+    const providerName = userDataMap[user.uid]?.providerName;
+    const ops = [];
+
+    // In-app bell notification
+    if (providerName) {
+      ops.push(db.collection("notifications").add({
+        recipientProviderName: providerName,
+        type: "intranet_post",
+        message: `${authorName} posted in ${categoryLabel}: "${preview}"`,
+        relatedId: postId,
+        createdByName: authorName,
+        read: false,
+        createdAt: new Date(),
+      }));
+    }
+
+    // Email via Trigger Email extension (writes to `mail` collection)
+    ops.push(db.collection("mail").add({
+      to: user.email,
+      message: {
+        subject: `[MindfulWayOS] New ${categoryLabel} post from ${authorName}`,
+        text: `${authorName} posted in ${categoryLabel}:\n\n${content}\n\n— MindfulWayOS Intranet`,
+        html: buildPostEmailHtml({ authorName, categoryLabel, content }),
+      },
+    }));
+
+    return ops;
+  });
+
+  await Promise.all(writes.flat());
+  logger.info(`INTRANET_NOTIFY sent to ${recipients.length} users for post ${postId}`);
+});
+
+function buildPostEmailHtml({ authorName, categoryLabel, content }) {
+  const escaped = content.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/\n/g, "<br>");
+  return `
+    <div style="font-family:sans-serif;max-width:560px;margin:0 auto;color:#111827">
+      <div style="background:#7c3aed;padding:20px 24px;border-radius:8px 8px 0 0">
+        <span style="color:#fff;font-weight:700;font-size:18px">MindfulWayOS Intranet</span>
+      </div>
+      <div style="border:1px solid #e5e7eb;border-top:none;padding:24px;border-radius:0 0 8px 8px">
+        <p style="margin:0 0 4px 0;font-size:13px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em">${categoryLabel}</p>
+        <p style="margin:0 0 16px 0;font-size:15px;font-weight:600">${authorName} posted a new update</p>
+        <div style="background:#f9fafb;border-left:3px solid #7c3aed;padding:12px 16px;border-radius:0 6px 6px 0;font-size:14px;line-height:1.6;color:#374151">${escaped}</div>
+        <p style="margin:20px 0 0 0;font-size:12px;color:#9ca3af">Log in to MindfulWayOS to react or reply.</p>
+      </div>
+    </div>`;
+}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 

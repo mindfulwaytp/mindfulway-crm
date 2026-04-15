@@ -29,7 +29,7 @@ function normalizeIpTele(raw) {
 /** "Monday, Tuesday" → ['monday', 'tuesday'] */
 function normalizeDays(raw) {
   if (!raw) return [];
-  return raw.split(/[,\/\n]+/).map((s) => s.trim().toLowerCase()).filter(Boolean);
+  return raw.split(/[,/\n]+/).map((s) => s.trim().toLowerCase()).filter(Boolean);
 }
 
 /**
