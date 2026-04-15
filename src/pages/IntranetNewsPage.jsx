@@ -66,7 +66,7 @@ function Avatar({ name, size = 36 }) {
 }
 
 // ── Compose Box ───────────────────────────────────────────────────────────────
-function ComposeBox({ authorName, authorUid, isAdmin, onPost }) {
+function ComposeBox({ authorName, isAdmin, onPost }) {
   const [content, setContent] = useState('');
   const [category, setCategory] = useState('general');
   const [sendNotification, setSendNotification] = useState(false);
@@ -545,7 +545,6 @@ export default function IntranetNewsPage({ embedded = false }) {
         <div>
           <ComposeBox
             authorName={displayName}
-            authorUid={user.uid}
             isAdmin={isAdmin}
             onPost={handlePost}
           />
