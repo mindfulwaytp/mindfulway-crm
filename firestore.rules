@@ -120,6 +120,24 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ── Intranet config — signed-in read; admin write ─────────────────────────
+    match /intranet_config/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ── Intranet resource links (shared folders, docs) — admin write ─────────
+    match /intranet_resources/{resourceId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ── Intranet website links — admin write ─────────────────────────────────
+    match /intranet_links/{linkId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
     // ── Notifications ────────────────────────────────────────────────────────
     // - Recipient: read/update (mark read) own
     // - Admin/supervisor: create

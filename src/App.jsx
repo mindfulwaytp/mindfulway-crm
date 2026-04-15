@@ -2,6 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import HubPage from './pages/HubPage';
 import IntranetPage from './pages/IntranetPage';
+import IntranetNewsPage from './pages/IntranetNewsPage';
+import IntranetResourcesPage from './pages/IntranetResourcesPage';
+import IntranetPoliciesPage from './pages/IntranetPoliciesPage';
 import {
   DragDropContext,
   Droppable,
@@ -1171,6 +1174,9 @@ export default function App() {
       <Routes>
         <Route path="/" element={<HubPage />} />
         <Route path="/intranet" element={<IntranetPage />} />
+        <Route path="/intranet/news" element={<IntranetNewsPage />} />
+        <Route path="/intranet/resources" element={<IntranetResourcesPage />} />
+        <Route path="/intranet/policies" element={<IntranetPoliciesPage />} />
         <Route path="/availability" element={<AvailabilityWithNav />} />
         <Route path="/hours" element={isIntern ? <MyHoursPage /> : <InternHoursPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
@@ -1183,6 +1189,9 @@ export default function App() {
       <Routes>
         <Route path="/" element={<HubPage />} />
         <Route path="/intranet" element={<IntranetPage />} />
+        <Route path="/intranet/news" element={<IntranetNewsPage />} />
+        <Route path="/intranet/resources" element={<IntranetResourcesPage />} />
+        <Route path="/intranet/policies" element={<IntranetPoliciesPage />} />
         <Route path="/availability" element={<AvailabilityPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
@@ -1213,7 +1222,7 @@ function AdminApp({ signOut }) {
     if (p === '/providers') return 'providers';
     if (p === '/availability') return 'availability';
     if (p === '/hours') return 'intern-hours';
-    if (p === '/intranet') return 'intranet';
+    if (p.startsWith('/intranet')) return 'intranet';
     return 'active';
   }, [location.pathname]);
 
@@ -1701,6 +1710,9 @@ function AdminApp({ signOut }) {
         ) : view === 'intern-hours' ? (
           <InternHoursPage />
         ) : view === 'intranet' ? (
+          location.pathname === '/intranet/news' ? <IntranetNewsPage embedded /> :
+          location.pathname === '/intranet/resources' ? <IntranetResourcesPage embedded /> :
+          location.pathname === '/intranet/policies' ? <IntranetPoliciesPage embedded /> :
           <IntranetPage embedded />
         ) : (
         <main style={{ padding: 32, overflowX: 'clip', minWidth: 0 }}>
