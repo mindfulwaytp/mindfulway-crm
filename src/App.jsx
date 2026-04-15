@@ -11,10 +11,34 @@ import {
   Draggable,
 } from '@hello-pangea/dnd';
 import {
-  subscribeToInquiries,
+  fetchInquiries,
+  fetchInquiriesSince,
   updateInquiry as updateInquiryApi,
   createInquiry,
 } from './lib/inquiriesApi';
+
+const INTAKES_CACHE_KEY = 'mw_intakes_cache';
+
+function loadIntakesCache() {
+  try {
+    const raw = localStorage.getItem(INTAKES_CACHE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+function saveIntakesCache(inquiries, lastSyncedAt) {
+  try {
+    localStorage.setItem(INTAKES_CACHE_KEY, JSON.stringify({ inquiries, lastSyncedAt }));
+  } catch (e) { console.warn('Intakes cache save failed:', e); }
+}
+
+function mergeIntakes(cached, changed) {
+  const map = Object.fromEntries(cached.map((i) => [i.id, i]));
+  changed.forEach((i) => { map[i.id] = i; });
+  return Object.values(map).sort(
+    (a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0),
+  );
+}
 import ProvidersPage from './pages/ProvidersPage';
 import AvailabilityPage from './pages/AvailabilityPage';
 import MyHoursPage from './pages/MyHoursPage';
@@ -1146,7 +1170,7 @@ function DetailPanel({
 export default function App() {
   const { user, isAdmin, isSupervisor, isIntern, isProvider, accessDenied, loading: authLoading, signOut } = useAuth();
 
-  // Lifted here so the subscription survives Hub navigation (AdminApp remounts on route changes)
+  // Lifted here so data survives Hub navigation (AdminApp remounts on route changes)
   const [intakes, setIntakes] = useState([]);
   const [providerProfiles, setProviderProfiles] = useState([]);
   const [intakesLoading, setIntakesLoading] = useState(true);
@@ -1154,14 +1178,33 @@ export default function App() {
 
   useEffect(() => {
     if (!isAdmin || !user) return;
-    const unsub = subscribeToInquiries(
-      (rows) => { setIntakes(rows); setIntakesLoading(false); },
-      (err) => { setIntakesError(err.message || 'Failed to load intakes'); setIntakesLoading(false); },
-    );
+    async function load() {
+      try {
+        const cache = loadIntakesCache();
+        if (cache) {
+          setIntakes(cache.inquiries);
+          setIntakesLoading(false);
+          const changed = await fetchInquiriesSince(cache.lastSyncedAt);
+          if (changed.length > 0) {
+            const merged = mergeIntakes(cache.inquiries, changed);
+            setIntakes(merged);
+            saveIntakesCache(merged, Date.now());
+          }
+        } else {
+          const data = await fetchInquiries();
+          setIntakes(data);
+          setIntakesLoading(false);
+          saveIntakesCache(data, Date.now());
+        }
+      } catch (err) {
+        setIntakesError(err.message || 'Failed to load intakes');
+        setIntakesLoading(false);
+      }
+    }
+    load();
     fetchProviderProfiles()
       .then(setProviderProfiles)
       .catch((err) => console.error('Failed to load provider profiles', err));
-    return unsub;
   }, [isAdmin, user]);
 
   // Auth gate — must resolve before rendering anything
