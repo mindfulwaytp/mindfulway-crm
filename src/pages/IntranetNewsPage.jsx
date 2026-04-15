@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/AuthContext';
+import { useEditor, EditorContent } from '@tiptap/react';
+import StarterKit from '@tiptap/starter-kit';
+import DOMPurify from 'dompurify';
 import {
   subscribeToFeed, createPost, deletePost, pinPost,
   toggleReaction, acknowledgePost, subscribeToComments, addComment, deleteComment,
@@ -65,22 +68,57 @@ function Avatar({ name, size = 36 }) {
   );
 }
 
+// ── Toolbar Button ────────────────────────────────────────────────────────────
+function ToolbarBtn({ onClick, active, title, children }) {
+  return (
+    <button
+      onMouseDown={(e) => { e.preventDefault(); onClick(); }}
+      title={title}
+      style={{
+        padding: '3px 8px', borderRadius: 6, border: 'none', fontSize: 13,
+        fontWeight: 700, cursor: 'pointer', lineHeight: 1.4,
+        background: active ? '#ede9fe' : 'transparent',
+        color: active ? '#7c3aed' : '#6b7280',
+      }}
+    >
+      {children}
+    </button>
+  );
+}
+
 // ── Compose Box ───────────────────────────────────────────────────────────────
 function ComposeBox({ authorName, isAdmin, onPost }) {
-  const [content, setContent] = useState('');
   const [category, setCategory] = useState('general');
   const [sendNotification, setSendNotification] = useState(false);
   const [requiresAcknowledgement, setRequiresAcknowledgement] = useState(false);
   const [posting, setPosting] = useState(false);
+  const postingRef = useRef(false);
 
-  async function handlePost() {
-    if (!content.trim()) return;
+  const editor = useEditor({
+    extensions: [StarterKit],
+    editorProps: {
+      attributes: { class: 'mw-editor' },
+      handleKeyDown: (_view, e) => {
+        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+          if (!postingRef.current) doPost();
+          return true;
+        }
+      },
+    },
+  });
+
+  const isEmpty = !editor || editor.isEmpty;
+
+  async function doPost() {
+    if (isEmpty || postingRef.current) return;
+    postingRef.current = true;
     setPosting(true);
-    await onPost({ content, category, sendNotification, requiresAcknowledgement });
-    setContent('');
+    await onPost({ content: editor.getHTML(), category, sendNotification, requiresAcknowledgement });
+    editor.commands.clearContent();
     setCategory('general');
     setSendNotification(false);
     setRequiresAcknowledgement(false);
+    postingRef.current = false;
     setPosting(false);
   }
 
@@ -94,19 +132,23 @@ function ComposeBox({ authorName, isAdmin, onPost }) {
       <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
         <Avatar name={authorName} />
         <div style={{ flex: 1 }}>
-          <textarea
-            placeholder="Share an update, announcement, or celebration…"
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handlePost(); }}
-            style={{
-              width: '100%', minHeight: 80, resize: 'vertical',
-              border: '1px solid #e5e7eb', borderRadius: 10,
-              padding: '10px 12px', fontSize: 14,
-              fontFamily: 'inherit', outline: 'none',
-              boxSizing: 'border-box', lineHeight: 1.5,
-            }}
-          />
+          {/* Toolbar */}
+          <div style={{
+            display: 'flex', gap: 2, padding: '4px 6px',
+            background: '#f9fafb', border: '1px solid #e5e7eb',
+            borderRadius: '10px 10px 0 0', borderBottom: 'none',
+          }}>
+            <ToolbarBtn onClick={() => editor?.chain().focus().toggleBold().run()} active={editor?.isActive('bold')} title="Bold">B</ToolbarBtn>
+            <ToolbarBtn onClick={() => editor?.chain().focus().toggleItalic().run()} active={editor?.isActive('italic')} title="Italic"><em>I</em></ToolbarBtn>
+            <ToolbarBtn onClick={() => editor?.chain().focus().toggleStrike().run()} active={editor?.isActive('strike')} title="Strikethrough"><s>S</s></ToolbarBtn>
+            <div style={{ width: 1, background: '#e5e7eb', margin: '2px 4px' }} />
+            <ToolbarBtn onClick={() => editor?.chain().focus().toggleBulletList().run()} active={editor?.isActive('bulletList')} title="Bullet list">• List</ToolbarBtn>
+            <ToolbarBtn onClick={() => editor?.chain().focus().toggleOrderedList().run()} active={editor?.isActive('orderedList')} title="Numbered list">1. List</ToolbarBtn>
+          </div>
+          {/* Editor area */}
+          <div style={{ border: '1px solid #e5e7eb', borderRadius: '0 0 10px 10px', background: '#fff' }}>
+            <EditorContent editor={editor} />
+          </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 10, alignItems: 'center', flexWrap: 'wrap' }}>
             <select
               value={category}
@@ -128,34 +170,24 @@ function ComposeBox({ authorName, isAdmin, onPost }) {
             </select>
             {isAdmin && (
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#6b7280', cursor: 'pointer', marginLeft: 4 }}>
-                <input
-                  type="checkbox"
-                  checked={sendNotification}
-                  onChange={(e) => setSendNotification(e.target.checked)}
-                  style={{ cursor: 'pointer', accentColor: '#7c3aed' }}
-                />
+                <input type="checkbox" checked={sendNotification} onChange={(e) => setSendNotification(e.target.checked)} style={{ cursor: 'pointer', accentColor: '#7c3aed' }} />
                 Send notification
               </label>
             )}
             {isAdmin && (
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#6b7280', cursor: 'pointer' }}>
-                <input
-                  type="checkbox"
-                  checked={requiresAcknowledgement}
-                  onChange={(e) => setRequiresAcknowledgement(e.target.checked)}
-                  style={{ cursor: 'pointer', accentColor: '#059669' }}
-                />
+                <input type="checkbox" checked={requiresAcknowledgement} onChange={(e) => setRequiresAcknowledgement(e.target.checked)} style={{ cursor: 'pointer', accentColor: '#059669' }} />
                 Requires acknowledgement
               </label>
             )}
             <button
-              onClick={handlePost}
-              disabled={!content.trim() || posting}
+              onClick={doPost}
+              disabled={isEmpty || posting}
               style={{
                 marginLeft: 'auto', padding: '8px 18px', borderRadius: 10,
                 border: 'none', background: '#7c3aed', color: '#fff',
                 fontWeight: 700, fontSize: 14, cursor: 'pointer',
-                opacity: (!content.trim() || posting) ? 0.5 : 1,
+                opacity: (isEmpty || posting) ? 0.5 : 1,
               }}
             >
               {posting ? 'Posting…' : 'Post'}
@@ -328,9 +360,11 @@ function PostCard({ post, currentUid, currentName, isAdmin, onDelete, onPin, onR
         )}
       </div>
 
-      <p style={{ margin: '0 0 14px', fontSize: 15, color: '#111827', lineHeight: 1.6, whiteSpace: 'pre-wrap' }}>
-        {post.content}
-      </p>
+      <div
+        className="mw-post-content"
+        style={{ margin: '0 0 14px', fontSize: 15, color: '#111827', lineHeight: 1.6 }}
+        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(post.content) }}
+      />
 
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 12 }}>
         {REACTIONS.map(({ key, emoji }) => {
@@ -435,6 +469,21 @@ function PostCard({ post, currentUid, currentName, isAdmin, onDelete, onPin, onR
   );
 }
 
+// ── Editor + Post Content Styles ──────────────────────────────────────────────
+const editorStyles = `
+  .mw-editor { min-height: 80px; padding: 10px 12px; font-size: 14px; font-family: inherit; line-height: 1.5; outline: none; }
+  .mw-editor p { margin: 0 0 4px; }
+  .mw-editor ul, .mw-editor ol { margin: 4px 0; padding-left: 20px; }
+  .mw-editor li { margin-bottom: 2px; }
+  .mw-editor p.is-editor-empty:first-child::before { content: attr(data-placeholder); color: #9ca3af; pointer-events: none; float: left; height: 0; }
+  .mw-post-content p { margin: 0 0 6px; }
+  .mw-post-content ul, .mw-post-content ol { margin: 4px 0; padding-left: 20px; }
+  .mw-post-content li { margin-bottom: 2px; }
+  .mw-post-content strong { font-weight: 700; }
+  .mw-post-content em { font-style: italic; }
+  .mw-post-content s { text-decoration: line-through; }
+`;
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function IntranetNewsPage({ embedded = false }) {
   const navigate = useNavigate();
@@ -501,6 +550,7 @@ export default function IntranetNewsPage({ embedded = false }) {
 
   return (
     <div style={{ minHeight: '100vh', background: '#f7f7f8' }}>
+      <style>{editorStyles}</style>
       {!embedded && (
         <div style={{
           background: '#fff', borderBottom: '1px solid #e5e7eb',

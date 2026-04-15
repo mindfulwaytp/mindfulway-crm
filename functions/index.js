@@ -317,7 +317,7 @@ function buildPostEmailHtml({ authorName, categoryLabel, content }) {
         <p style="margin:0 0 4px 0;font-size:13px;color:#6b7280;text-transform:uppercase;letter-spacing:.05em">${categoryLabel}</p>
         <p style="margin:0 0 16px 0;font-size:15px;font-weight:600">${authorName} posted a new update</p>
         <div style="background:#f9fafb;border-left:3px solid #7c3aed;padding:12px 16px;border-radius:0 6px 6px 0;font-size:14px;line-height:1.6;color:#374151">${escaped}</div>
-        <p style="margin:20px 0 0 0;font-size:12px;color:#9ca3af">Log in to MindfulWayOS to react or reply.</p>
+        <p style="margin:20px 0 0 0;font-size:12px;color:#9ca3af">Log in to <a href="https://mindfulway-crm.pages.dev/" style="color:#7c3aed;text-decoration:none;font-weight:600">MindfulWayOS</a> to react or reply.</p>
       </div>
     </div>`;
 }

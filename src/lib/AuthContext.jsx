@@ -1,7 +1,10 @@
-import { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import { onAuthStateChanged, signInWithPopup, signOut as firebaseSignOut } from 'firebase/auth';
 import { auth, googleProvider } from './firebase';
 import { getOrCreateUserRole } from './usersApi';
+
+const IDLE_TIMEOUT_MS = 60 * 60 * 1000; // 60 minutes
+const IDLE_EVENTS = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'];
 
 const AuthContext = createContext(null);
 
@@ -11,6 +14,27 @@ export function AuthProvider({ children }) {
   const [providerName, setProviderName] = useState(null);
   const [loading, setLoading] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
+  const idleTimer = useRef(null);
+
+  // Idle-activity auto-logout: signs the user out after 60 min of no interaction
+  useEffect(() => {
+    if (!user) return;
+
+    function resetTimer() {
+      clearTimeout(idleTimer.current);
+      idleTimer.current = setTimeout(() => {
+        firebaseSignOut(auth);
+      }, IDLE_TIMEOUT_MS);
+    }
+
+    resetTimer();
+    IDLE_EVENTS.forEach((e) => window.addEventListener(e, resetTimer, { passive: true }));
+
+    return () => {
+      clearTimeout(idleTimer.current);
+      IDLE_EVENTS.forEach((e) => window.removeEventListener(e, resetTimer));
+    };
+  }, [user]);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {

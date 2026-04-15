@@ -1343,6 +1343,7 @@ function AdminApp({ signOut, intakes, setIntakes, providerProfiles, setProviderP
   const [isEditing, setIsEditing] = useState(false);
   const [draftInquiry, setDraftInquiry] = useState(null);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState('');
   const [collapsedColumns, setCollapsedColumns] = useState({});
   const [columnSort, setColumnSort] = useState({});
   const [pipelineFilters, setPipelineFilters] = useState({ name: '', phone: '', insurance: [], provider: '', internOk: false, modality: [] });
@@ -1431,7 +1432,7 @@ function AdminApp({ signOut, intakes, setIntakes, providerProfiles, setProviderP
     if (!selectedInquiry || !draftInquiry) return;
 
     setSaving(true);
-    setError('');
+    setSaveError('');
 
     try {
       const updatedRecord = cloneData(draftInquiry);
@@ -1467,13 +1468,15 @@ function AdminApp({ signOut, intakes, setIntakes, providerProfiles, setProviderP
 
       await updateInquiryApi(selectedInquiry.id, changes);
 
-      setIntakes((prev) =>
-        prev.map((item) => (item.id === selectedInquiry.id ? updatedRecord : item))
-      );
+      setIntakes((prev) => {
+        const updated = prev.map((item) => (item.id === selectedInquiry.id ? updatedRecord : item));
+        saveIntakesCache(updated, Date.now());
+        return updated;
+      });
 
       closeInquiry();
     } catch (err) {
-      setError(err.message || 'Failed to save inquiry');
+      setSaveError(err.message || 'Failed to save inquiry');
     } finally {
       setSaving(false);
     }
@@ -1516,7 +1519,7 @@ function AdminApp({ signOut, intakes, setIntakes, providerProfiles, setProviderP
       await updateInquiryApi(draggableId, { 'pipeline.status': newStatus });
     } catch (err) {
       setIntakes(previousIntakes);
-      setError(err.message || 'Failed to update status');
+      setSaveError(err.message || 'Failed to update status');
 
       if (selectedInquiry?.id === draggableId) {
         const previousSelected = previousIntakes.find((item) => item.id === draggableId);
@@ -1803,7 +1806,7 @@ function AdminApp({ signOut, intakes, setIntakes, providerProfiles, setProviderP
           <IntranetPage embedded />
         ) : (
         <main style={{ padding: 32, overflowX: 'clip', minWidth: 0 }}>
-          {error ? (
+          {(error || saveError) ? (
             <div
               style={{
                 marginBottom: 16,
@@ -1814,7 +1817,7 @@ function AdminApp({ signOut, intakes, setIntakes, providerProfiles, setProviderP
                 border: '1px solid #f3c2c2',
               }}
             >
-              {error}
+              {error || saveError}
             </div>
           ) : null}
 
