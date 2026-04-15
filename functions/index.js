@@ -252,7 +252,13 @@ const CATEGORY_LABELS = {
 export const onNewIntranetPost = onDocumentCreated("intranet_posts/{postId}", async (event) => {
   const post = event.data.data();
   const postId = event.params.postId;
-  const { authorName, content, category } = post;
+  const { authorName, content, category, sendNotification } = post;
+
+  // Only notify if the author explicitly opted in
+  if (!sendNotification) {
+    logger.info(`INTRANET_NOTIFY skipped for post ${postId} (sendNotification=false)`);
+    return;
+  }
 
   const categoryLabel = CATEGORY_LABELS[category] || category;
   const preview = content.length > 120 ? content.slice(0, 120) + "…" : content;

@@ -462,6 +462,7 @@ export default function IntranetNewsPage({ embedded = false }) {
         content,
         category,
         requiresAcknowledgement,
+        sendNotification,
       });
       if (sendNotification) {
         const providers = await fetchProviderProfiles();

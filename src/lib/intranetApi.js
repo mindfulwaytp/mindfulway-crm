@@ -26,7 +26,7 @@ export function subscribeToFeed(callback, onError) {
 
 // ── Posts ─────────────────────────────────────────────────────────────────────
 
-export async function createPost({ authorUid, authorName, content, category, requiresAcknowledgement = false }) {
+export async function createPost({ authorUid, authorName, content, category, requiresAcknowledgement = false, sendNotification = false }) {
   return addDoc(collection(db, POSTS), {
     authorUid,
     authorName,
@@ -36,6 +36,7 @@ export async function createPost({ authorUid, authorName, content, category, req
     reactions: {},
     commentCount: 0,
     requiresAcknowledgement,
+    sendNotification,
     createdAt: Timestamp.now(),
   });
 }
