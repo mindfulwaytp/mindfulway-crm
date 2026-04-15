@@ -6,8 +6,10 @@ import {
   doc,
   query,
   orderBy,
+  where,
   serverTimestamp,
   onSnapshot,
+  Timestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
 
@@ -21,6 +23,17 @@ export async function fetchInquiries() {
     id: d.id,
     ...d.data(),
   }));
+}
+
+/** Fetch only inquiries updated after a given timestamp (ms since epoch). */
+export async function fetchInquiriesSince(sinceMs) {
+  const q = query(
+    inquiriesRef,
+    where('updatedAt', '>', Timestamp.fromMillis(sinceMs)),
+    orderBy('updatedAt', 'desc'),
+  );
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 }
 
 export async function createInquiry(data) {

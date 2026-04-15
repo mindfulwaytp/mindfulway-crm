@@ -5,6 +5,8 @@ import {
   subscribeToFeed, createPost, deletePost, pinPost,
   toggleReaction, subscribeToComments, addComment, deleteComment,
 } from '../lib/intranetApi';
+import { fetchProviderProfiles } from '../lib/providersProfileApi';
+import { createNotification } from '../lib/notificationsApi';
 
 const REACTIONS = [
   { key: 'heart',      emoji: '❤️' },
@@ -64,17 +66,19 @@ function Avatar({ name, size = 36 }) {
 }
 
 // ── Compose Box ───────────────────────────────────────────────────────────────
-function ComposeBox({ authorName, authorUid, onPost }) {
+function ComposeBox({ authorName, authorUid, isAdmin, onPost }) {
   const [content, setContent] = useState('');
   const [category, setCategory] = useState('general');
+  const [sendNotification, setSendNotification] = useState(false);
   const [posting, setPosting] = useState(false);
 
   async function handlePost() {
     if (!content.trim()) return;
     setPosting(true);
-    await onPost({ content, category });
+    await onPost({ content, category, sendNotification });
     setContent('');
     setCategory('general');
+    setSendNotification(false);
     setPosting(false);
   }
 
@@ -116,6 +120,17 @@ function ComposeBox({ authorName, authorUid, onPost }) {
                 {c.label}
               </button>
             ))}
+            {isAdmin && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#6b7280', cursor: 'pointer', marginLeft: 4 }}>
+                <input
+                  type="checkbox"
+                  checked={sendNotification}
+                  onChange={(e) => setSendNotification(e.target.checked)}
+                  style={{ cursor: 'pointer', accentColor: '#7c3aed' }}
+                />
+                Send notification
+              </label>
+            )}
             <button
               onClick={handlePost}
               disabled={!content.trim() || posting}
@@ -364,14 +379,26 @@ export default function IntranetNewsPage({ embedded = false }) {
     return unsub;
   }, []);
 
-  async function handlePost({ content, category }) {
+  async function handlePost({ content, category, sendNotification }) {
     try {
-      await createPost({
+      const postRef = await createPost({
         authorUid: user.uid,
         authorName: displayName,
         content,
         category,
       });
+      if (sendNotification) {
+        const providers = await fetchProviderProfiles();
+        await Promise.all(providers.map((p) =>
+          createNotification({
+            recipientProviderName: p.name,
+            type: 'intranet_post',
+            message: `${displayName} posted in News & Updates: "${content.slice(0, 80)}${content.length > 80 ? '…' : ''}"`,
+            relatedId: postRef.id,
+            createdByName: displayName,
+          })
+        ));
+      }
     } catch (err) {
       console.error('Post error:', err);
       alert('Failed to post: ' + err.message);
@@ -438,6 +465,7 @@ export default function IntranetNewsPage({ embedded = false }) {
           <ComposeBox
             authorName={displayName}
             authorUid={user.uid}
+            isAdmin={isAdmin}
             onPost={handlePost}
           />
 
