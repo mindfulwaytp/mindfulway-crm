@@ -1146,6 +1146,24 @@ function DetailPanel({
 export default function App() {
   const { user, isAdmin, isSupervisor, isIntern, isProvider, accessDenied, loading: authLoading, signOut } = useAuth();
 
+  // Lifted here so the subscription survives Hub navigation (AdminApp remounts on route changes)
+  const [intakes, setIntakes] = useState([]);
+  const [providerProfiles, setProviderProfiles] = useState([]);
+  const [intakesLoading, setIntakesLoading] = useState(true);
+  const [intakesError, setIntakesError] = useState('');
+
+  useEffect(() => {
+    if (!isAdmin || !user) return;
+    const unsub = subscribeToInquiries(
+      (rows) => { setIntakes(rows); setIntakesLoading(false); },
+      (err) => { setIntakesError(err.message || 'Failed to load intakes'); setIntakesLoading(false); },
+    );
+    fetchProviderProfiles()
+      .then(setProviderProfiles)
+      .catch((err) => console.error('Failed to load provider profiles', err));
+    return unsub;
+  }, [isAdmin, user]);
+
   // Auth gate — must resolve before rendering anything
   if (authLoading) {
     return (
@@ -1164,7 +1182,17 @@ export default function App() {
       <Routes>
         <Route path="/" element={<HubPage />} />
         {/* All admin app paths handled by AdminApp — single instance preserves state */}
-        <Route path="/*" element={<AdminApp signOut={signOut} />} />
+        <Route path="/*" element={
+          <AdminApp
+            signOut={signOut}
+            intakes={intakes}
+            setIntakes={setIntakes}
+            providerProfiles={providerProfiles}
+            setProviderProfiles={setProviderProfiles}
+            loading={intakesLoading}
+            error={intakesError}
+          />
+        } />
       </Routes>
     );
   }
@@ -1206,11 +1234,7 @@ function AvailabilityWithNav() {
   return <AvailabilityPage onNav={() => navigate('/hours')} />;
 }
 
-function AdminApp({ signOut }) {
-  const [intakes, setIntakes] = useState([]);
-  const [providerProfiles, setProviderProfiles] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+function AdminApp({ signOut, intakes, setIntakes, providerProfiles, setProviderProfiles, loading, error }) {
   const [updatingId, setUpdatingId] = useState('');
   const location = useLocation();
   const navigate = useNavigate();
@@ -1241,31 +1265,6 @@ function AdminApp({ signOut }) {
   const [showNewEntry, setShowNewEntry] = useState(false);
   const PAGE_SIZE = 25;
 
-  useEffect(() => {
-    const unsub = subscribeToInquiries(
-      (rows) => {
-        setIntakes(rows);
-        setLoading(false);
-      },
-      (err) => {
-        setError(err.message || 'Failed to load intakes');
-        setLoading(false);
-      },
-    );
-
-    async function loadProfiles() {
-      try {
-        const profiles = await fetchProviderProfiles();
-        setProviderProfiles(profiles);
-      } catch (err) {
-        console.error('Failed to load provider profiles', err);
-      }
-    }
-
-    loadProfiles();
-
-    return () => unsub();
-  }, []);
 
   async function handleQuickAssign(inquiryId, providerName) {
     try {

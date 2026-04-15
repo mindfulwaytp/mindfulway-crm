@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../lib/AuthContext';
 import {
   subscribeToFeed, createPost, deletePost, pinPost,
-  toggleReaction, subscribeToComments, addComment, deleteComment,
+  toggleReaction, acknowledgePost, subscribeToComments, addComment, deleteComment,
 } from '../lib/intranetApi';
 import { fetchProviderProfiles } from '../lib/providersProfileApi';
 import { createNotification } from '../lib/notificationsApi';
@@ -70,15 +70,17 @@ function ComposeBox({ authorName, authorUid, isAdmin, onPost }) {
   const [content, setContent] = useState('');
   const [category, setCategory] = useState('general');
   const [sendNotification, setSendNotification] = useState(false);
+  const [requiresAcknowledgement, setRequiresAcknowledgement] = useState(false);
   const [posting, setPosting] = useState(false);
 
   async function handlePost() {
     if (!content.trim()) return;
     setPosting(true);
-    await onPost({ content, category, sendNotification });
+    await onPost({ content, category, sendNotification, requiresAcknowledgement });
     setContent('');
     setCategory('general');
     setSendNotification(false);
+    setRequiresAcknowledgement(false);
     setPosting(false);
   }
 
@@ -106,20 +108,24 @@ function ComposeBox({ authorName, authorUid, isAdmin, onPost }) {
             }}
           />
           <div style={{ display: 'flex', gap: 8, marginTop: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-            {CATEGORIES.map((c) => (
-              <button
-                key={c.key}
-                onClick={() => setCategory(c.key)}
-                style={{
-                  padding: '4px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600,
-                  cursor: 'pointer', border: `1px solid ${c.border}`,
-                  background: category === c.key ? c.bg : '#fff',
-                  color: category === c.key ? c.color : '#9ca3af',
-                }}
-              >
-                {c.label}
-              </button>
-            ))}
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value)}
+              style={{
+                padding: '4px 10px', borderRadius: 20, fontSize: 12, fontWeight: 600,
+                cursor: 'pointer', border: '1px solid #e5e7eb',
+                background: '#fff', color: '#6b7280',
+                outline: 'none', appearance: 'none',
+                paddingRight: 24,
+                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%236b7280' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E")`,
+                backgroundRepeat: 'no-repeat',
+                backgroundPosition: 'right 8px center',
+              }}
+            >
+              {CATEGORIES.map((c) => (
+                <option key={c.key} value={c.key}>{c.label}</option>
+              ))}
+            </select>
             {isAdmin && (
               <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#6b7280', cursor: 'pointer', marginLeft: 4 }}>
                 <input
@@ -129,6 +135,17 @@ function ComposeBox({ authorName, authorUid, isAdmin, onPost }) {
                   style={{ cursor: 'pointer', accentColor: '#7c3aed' }}
                 />
                 Send notification
+              </label>
+            )}
+            {isAdmin && (
+              <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#6b7280', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={requiresAcknowledgement}
+                  onChange={(e) => setRequiresAcknowledgement(e.target.checked)}
+                  style={{ cursor: 'pointer', accentColor: '#059669' }}
+                />
+                Requires acknowledgement
               </label>
             )}
             <button
@@ -242,10 +259,13 @@ function CommentSection({ postId, currentUid, currentName, isAdmin }) {
 }
 
 // ── Post Card ─────────────────────────────────────────────────────────────────
-function PostCard({ post, currentUid, currentName, isAdmin, onDelete, onPin, onReact }) {
+function PostCard({ post, currentUid, currentName, isAdmin, onDelete, onPin, onReact, onAcknowledge }) {
   const [showComments, setShowComments] = useState(false);
+  const [showAcks, setShowAcks] = useState(false);
   const cat = categoryMeta(post.category);
   const isOwn = post.authorUid === currentUid;
+  const acks = Object.entries(post.acknowledgements || {});
+  const hasAcknowledged = Boolean(post.acknowledgements?.[currentUid]);
 
   return (
     <div style={{
@@ -334,7 +354,62 @@ function PostCard({ post, currentUid, currentName, isAdmin, onDelete, onPin, onR
             </button>
           );
         })}
+
+        <div style={{ width: 1, height: 20, background: '#e5e7eb', margin: '0 2px', flexShrink: 0 }} />
+
+        <button
+          onClick={() => !hasAcknowledged && onAcknowledge(post.id)}
+          disabled={hasAcknowledged}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            padding: '4px 10px', borderRadius: 20, fontSize: 13,
+            border: hasAcknowledged ? '1.5px solid #bbf7d0' : post.requiresAcknowledgement ? '1px solid #6ee7b7' : '1px solid #e5e7eb',
+            background: hasAcknowledged ? '#ecfdf5' : post.requiresAcknowledgement ? '#f0fdf4' : '#fff',
+            color: hasAcknowledged ? '#059669' : post.requiresAcknowledgement ? '#047857' : '#6b7280',
+            fontWeight: hasAcknowledged ? 700 : post.requiresAcknowledgement ? 600 : 400,
+            cursor: hasAcknowledged ? 'default' : 'pointer',
+          }}
+        >
+          <span>{hasAcknowledged ? '✓' : '○'}</span>
+          <span>{hasAcknowledged ? 'Acknowledged' : 'Acknowledge'}</span>
+          {post.requiresAcknowledgement && !hasAcknowledged && (
+            <span style={{ fontSize: 10, fontWeight: 700, color: '#059669', background: '#d1fae5', borderRadius: 6, padding: '1px 5px', marginLeft: 2 }}>
+              Required
+            </span>
+          )}
+        </button>
+
+        {isAdmin && acks.length > 0 && (
+          <button
+            onClick={() => setShowAcks((v) => !v)}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              fontSize: 13, color: '#6b7280', fontWeight: 600, padding: 0,
+            }}
+          >
+            👥 {acks.length} {acks.length === 1 ? 'person' : 'people'}
+          </button>
+        )}
       </div>
+
+      {isAdmin && showAcks && (
+        <div style={{ marginBottom: 12, background: '#f9fafb', borderRadius: 10, padding: '10px 14px' }}>
+          {acks
+            .sort((a, b) => (a[1].acknowledgedAt?.seconds ?? 0) - (b[1].acknowledgedAt?.seconds ?? 0))
+            .map(([uid, ack]) => (
+              <div key={uid} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '4px 0' }}>
+                <span style={{ fontSize: 13, color: '#059669', fontWeight: 700 }}>✓</span>
+                <span style={{ fontSize: 13, color: '#111827', fontWeight: 600 }}>{ack.name}</span>
+                <span style={{ fontSize: 11, color: '#9ca3af', marginLeft: 'auto' }}>
+                  {ack.acknowledgedAt
+                    ? new Date(ack.acknowledgedAt.seconds * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+                    : ''}
+                </span>
+              </div>
+            ))
+          }
+        </div>
+      )}
 
       <button
         onClick={() => setShowComments((v) => !v)}
@@ -379,13 +454,14 @@ export default function IntranetNewsPage({ embedded = false }) {
     return unsub;
   }, []);
 
-  async function handlePost({ content, category, sendNotification }) {
+  async function handlePost({ content, category, sendNotification, requiresAcknowledgement }) {
     try {
       const postRef = await createPost({
         authorUid: user.uid,
         authorName: displayName,
         content,
         category,
+        requiresAcknowledgement,
       });
       if (sendNotification) {
         const providers = await fetchProviderProfiles();
@@ -416,6 +492,10 @@ export default function IntranetNewsPage({ embedded = false }) {
 
   async function handleReact(postId, reactionKey, currentlyReacted) {
     await toggleReaction(postId, reactionKey, user.uid, currentlyReacted);
+  }
+
+  async function handleAcknowledge(postId) {
+    await acknowledgePost(postId, user.uid, displayName);
   }
 
   return (
@@ -508,6 +588,7 @@ export default function IntranetNewsPage({ embedded = false }) {
                 onDelete={handleDelete}
                 onPin={handlePin}
                 onReact={handleReact}
+                onAcknowledge={handleAcknowledge}
               />
             ));
           })()}

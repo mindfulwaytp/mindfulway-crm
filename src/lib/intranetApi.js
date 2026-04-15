@@ -26,7 +26,7 @@ export function subscribeToFeed(callback, onError) {
 
 // ── Posts ─────────────────────────────────────────────────────────────────────
 
-export async function createPost({ authorUid, authorName, content, category }) {
+export async function createPost({ authorUid, authorName, content, category, requiresAcknowledgement = false }) {
   return addDoc(collection(db, POSTS), {
     authorUid,
     authorName,
@@ -35,6 +35,7 @@ export async function createPost({ authorUid, authorName, content, category }) {
     pinned: false,
     reactions: {},
     commentCount: 0,
+    requiresAcknowledgement,
     createdAt: Timestamp.now(),
   });
 }
@@ -45,6 +46,14 @@ export async function deletePost(postId) {
 
 export async function pinPost(postId, pinned) {
   await updateDoc(doc(db, POSTS, postId), { pinned });
+}
+
+// ── Acknowledgements ──────────────────────────────────────────────────────────
+
+export async function acknowledgePost(postId, uid, name) {
+  await updateDoc(doc(db, POSTS, postId), {
+    [`acknowledgements.${uid}`]: { name, acknowledgedAt: Timestamp.now() },
+  });
 }
 
 // ── Reactions ─────────────────────────────────────────────────────────────────
