@@ -8,7 +8,7 @@ import {
   Draggable,
 } from '@hello-pangea/dnd';
 import {
-  fetchInquiries,
+  subscribeToInquiries,
   updateInquiry as updateInquiryApi,
   createInquiry,
 } from './lib/inquiriesApi';
@@ -1233,16 +1233,16 @@ function AdminApp({ signOut }) {
   const PAGE_SIZE = 25;
 
   useEffect(() => {
-    async function loadIntakes() {
-      try {
-        const rows = await fetchInquiries();
+    const unsub = subscribeToInquiries(
+      (rows) => {
         setIntakes(rows);
-      } catch (err) {
-        setError(err.message || 'Failed to load intakes');
-      } finally {
         setLoading(false);
-      }
-    }
+      },
+      (err) => {
+        setError(err.message || 'Failed to load intakes');
+        setLoading(false);
+      },
+    );
 
     async function loadProfiles() {
       try {
@@ -1253,11 +1253,9 @@ function AdminApp({ signOut }) {
       }
     }
 
-    loadIntakes();
     loadProfiles();
 
-    const interval = setInterval(loadIntakes, 10000);
-    return () => clearInterval(interval);
+    return () => unsub();
   }, []);
 
   async function handleQuickAssign(inquiryId, providerName) {
@@ -2325,9 +2323,7 @@ function AdminApp({ signOut }) {
         {showNewEntry ? (
           <NewEntryModal
             onClose={() => setShowNewEntry(false)}
-            onCreated={async () => {
-              const rows = await fetchInquiries();
-              setIntakes(rows);
+            onCreated={() => {
               setShowNewEntry(false);
             }}
             providers={providerProfiles.map((p) => p.name).sort()}
