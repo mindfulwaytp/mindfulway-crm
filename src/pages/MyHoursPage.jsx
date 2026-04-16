@@ -10,7 +10,7 @@ import NotificationBell from '../components/NotificationBell';
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function ProgressBar({ logged, required, color, bg }) {
+function ProgressBar({ logged, required, color }) {
   const pct = required > 0 ? Math.min(100, Math.round((logged / required) * 100)) : 0;
   const over = required > 0 && logged >= required;
   return (

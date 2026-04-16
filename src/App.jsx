@@ -1285,6 +1285,15 @@ export default function App() {
     );
   }
 
+  if (isProvider) {
+    return (
+      <Routes>
+        <Route path="/" element={<HubPage />} />
+        <Route path="/*" element={<ProviderApp signOut={signOut} />} />
+      </Routes>
+    );
+  }
+
   if (isIntern || isSupervisor) {
     return (
       <Routes>
@@ -1300,26 +1309,83 @@ export default function App() {
     );
   }
 
-  if (isProvider) {
-    return (
-      <Routes>
-        <Route path="/" element={<HubPage />} />
-        <Route path="/intranet" element={<IntranetPage />} />
-        <Route path="/intranet/news" element={<IntranetNewsPage />} />
-        <Route path="/intranet/resources" element={<IntranetResourcesPage />} />
-        <Route path="/intranet/policies" element={<IntranetPoliciesPage />} />
-        <Route path="/availability" element={<AvailabilityPage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    );
-  }
-
   return <LoginPage accessDenied userEmail={user?.email} />;
 }
 
 function AvailabilityWithNav() {
   const navigate = useNavigate();
   return <AvailabilityPage onNav={() => navigate('/hours')} />;
+}
+
+function ProviderApp({ signOut }) {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const view = useMemo(() => {
+    const p = location.pathname;
+    if (p === '/availability') return 'availability';
+    if (p === '/hours') return 'hours';
+    if (p.startsWith('/intranet')) return 'intranet';
+    return 'availability';
+  }, [location.pathname]);
+
+  const navBtn = (active) => ({
+    textAlign: 'left',
+    padding: '12px 14px',
+    borderRadius: 10,
+    border: '1px solid',
+    borderColor: active ? '#c4b5fd' : '#e5e7eb',
+    background: active ? '#f5f3ff' : '#fff',
+    fontWeight: 600,
+    cursor: 'pointer',
+    width: '100%',
+  });
+
+  return (
+    <div style={{ minHeight: '100vh', display: 'grid', gridTemplateColumns: '240px 1fr', background: '#f7f7f8' }}>
+      <aside style={{ borderRight: '1px solid #e5e7eb', background: '#fff', padding: 24, display: 'flex', flexDirection: 'column' }}>
+        <div style={{ marginBottom: 32 }}>
+          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>MindfulWayOS</h2>
+          <p style={{ marginTop: 6, fontSize: 13, color: '#6b7280' }}>Internal Staff Portal</p>
+        </div>
+
+        <nav style={{ display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
+          <button onClick={() => navigate('/')} style={{ ...navBtn(false), color: '#6b7280', fontSize: 13 }}>
+            ← Hub
+          </button>
+
+          <button onClick={() => navigate('/availability')} style={navBtn(view === 'availability')}>
+            Availability
+          </button>
+
+          <button onClick={() => navigate('/intranet')} style={navBtn(view === 'intranet')}>
+            Intranet
+          </button>
+
+          <button onClick={() => navigate('/hours')} style={navBtn(view === 'hours')}>
+            Hours
+          </button>
+
+          <button onClick={signOut} style={{ ...navBtn(false), color: '#6b7280', marginTop: 'auto' }}>
+            Sign out
+          </button>
+        </nav>
+      </aside>
+
+      <div style={{ minWidth: 0 }}>
+        {view === 'availability' ? (
+          <AvailabilityPage />
+        ) : view === 'hours' ? (
+          <MyHoursPage />
+        ) : view === 'intranet' ? (
+          location.pathname === '/intranet/news' ? <IntranetNewsPage embedded /> :
+          location.pathname === '/intranet/resources' ? <IntranetResourcesPage embedded /> :
+          location.pathname === '/intranet/policies' ? <IntranetPoliciesPage embedded /> :
+          <IntranetPage embedded />
+        ) : null}
+      </div>
+    </div>
+  );
 }
 
 function AdminApp({ signOut, intakes, setIntakes, providerProfiles, setProviderProfiles, loading, error, lastSyncedAt, onRefresh }) {
