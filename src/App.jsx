@@ -500,7 +500,7 @@ function DetailPanel({
   onQuickAssign,
 }) {
   const record = isEditing ? draft : inquiry;
-  const providerNames = (providerProfiles || []).map((p) => p.name).sort();
+  const providerNames = (providerProfiles || []).map((p) => p.name).filter(Boolean).sort();
   const matchResults = useMemo(
     () => (providerProfiles && providerProfiles.length > 0 ? matchProviders(inquiry, providerProfiles) : []),
     [inquiry, providerProfiles]

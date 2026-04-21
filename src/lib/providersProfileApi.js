@@ -12,7 +12,7 @@ const providersRef = collection(db, 'providers');
 
 export async function fetchProviderProfiles() {
   const snap = await getDocs(providersRef);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+  return snap.docs.map((d) => ({ id: d.id, name: d.id, ...d.data() }));
 }
 
 export async function upsertProviderProfile(name, data) {
