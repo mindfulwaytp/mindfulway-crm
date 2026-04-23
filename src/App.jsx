@@ -41,6 +41,7 @@ function mergeIntakes(cached, changed) {
 }
 import ProvidersPage from './pages/ProvidersPage';
 import PersonnelFilesPage from './pages/PersonnelFilesPage';
+import PersonnelHubPage from './pages/PersonnelHubPage';
 import RequirementsPage from './pages/RequirementsPage';
 import AvailabilityPage from './pages/AvailabilityPage';
 import MyHoursPage from './pages/MyHoursPage';
@@ -1306,6 +1307,14 @@ export default function App() {
         <Route path="/intranet/policies" element={<IntranetPoliciesPage />} />
         <Route path="/availability" element={<AvailabilityWithNav />} />
         <Route path="/hours" element={isIntern ? <MyHoursPage /> : <InternHoursPage />} />
+        {isSupervisor && (
+          <>
+            <Route path="/personnel" element={<PersonnelHubPage />} />
+            <Route path="/personnel/files" element={<PersonnelFilesPage />} />
+            <Route path="/personnel/compliance" element={<RequirementsPage />} />
+            <Route path="/personnel/hours" element={<InternHoursPage />} />
+          </>
+        )}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     );
@@ -1322,11 +1331,13 @@ function AvailabilityWithNav() {
 function ProviderApp({ signOut }) {
   const location = useLocation();
   const navigate = useNavigate();
+  const { providerName } = useAuth();
 
   const view = useMemo(() => {
     const p = location.pathname;
     if (p === '/availability') return 'availability';
     if (p === '/hours') return 'hours';
+    if (p === '/personnel') return 'personnel';
     if (p.startsWith('/intranet')) return 'intranet';
     return 'availability';
   }, [location.pathname]);
@@ -1368,6 +1379,10 @@ function ProviderApp({ signOut }) {
             Hours
           </button>
 
+          <button onClick={() => navigate('/personnel')} style={navBtn(view === 'personnel')}>
+            My Files
+          </button>
+
           <button onClick={signOut} style={{ ...navBtn(false), color: '#6b7280', marginTop: 'auto' }}>
             Sign out
           </button>
@@ -1379,6 +1394,8 @@ function ProviderApp({ signOut }) {
           <AvailabilityPage />
         ) : view === 'hours' ? (
           <MyHoursPage />
+        ) : view === 'personnel' ? (
+          <PersonnelFilesPage lockedProvider={providerName} />
         ) : view === 'intranet' ? (
           location.pathname === '/intranet/news' ? <IntranetNewsPage embedded /> :
           location.pathname === '/intranet/resources' ? <IntranetResourcesPage embedded /> :
@@ -1400,13 +1417,16 @@ function AdminApp({ signOut, intakes, setIntakes, providerProfiles, setProviderP
     if (p === '/crm' || p === '/crm/active') return 'active';
     if (p === '/crm/all') return 'all';
     if (p === '/providers') return 'providers';
-    if (p === '/personnel') return 'personnel';
-    if (p === '/requirements') return 'requirements';
+    if (p === '/personnel') return 'personnel-hub';
+    if (p === '/personnel/files') return 'personnel';
+    if (p === '/personnel/compliance') return 'requirements';
+    if (p === '/personnel/hours') return 'intern-hours';
     if (p === '/availability') return 'availability';
-    if (p === '/hours') return 'intern-hours';
     if (p.startsWith('/intranet')) return 'intranet';
     return 'active';
   }, [location.pathname]);
+
+  const personnelOpen = ['personnel-hub', 'personnel', 'requirements', 'intern-hours'].includes(view);
 
   const crmOpen = view === 'active' || view === 'all';
   const [selectedInquiry, setSelectedInquiry] = useState(null);
@@ -1795,37 +1815,63 @@ function AdminApp({ signOut, intakes, setIntakes, providerProfiles, setProviderP
             Providers
           </button>
 
-          <button
-            onClick={() => navigate('/personnel')}
-            style={{
-              textAlign: 'left',
-              padding: '12px 14px',
-              borderRadius: 10,
-              border: '1px solid',
-              borderColor: view === 'personnel' ? '#c4b5fd' : '#e5e7eb',
-              background: view === 'personnel' ? '#f5f3ff' : '#fff',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            Personnel Files
-          </button>
+          {/* Personnel section */}
+          <div>
+            <button
+              onClick={() => navigate('/personnel')}
+              style={{
+                width: '100%',
+                textAlign: 'left',
+                padding: '12px 14px',
+                borderRadius: 10,
+                border: '1px solid',
+                borderColor: personnelOpen ? '#c4b5fd' : '#e5e7eb',
+                background: personnelOpen ? '#f5f3ff' : '#fff',
+                fontWeight: 700,
+                cursor: 'pointer',
+              }}
+            >
+              Personnel
+            </button>
 
-          <button
-            onClick={() => navigate('/requirements')}
-            style={{
-              textAlign: 'left',
-              padding: '12px 14px',
-              borderRadius: 10,
-              border: '1px solid',
-              borderColor: view === 'requirements' ? '#c4b5fd' : '#e5e7eb',
-              background: view === 'requirements' ? '#f5f3ff' : '#fff',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            Requirements
-          </button>
+            {personnelOpen && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4, paddingLeft: 12 }}>
+                <button
+                  onClick={() => navigate('/personnel/files')}
+                  style={{
+                    textAlign: 'left', padding: '9px 14px', borderRadius: 8, border: '1px solid',
+                    borderColor: view === 'personnel' ? '#c4b5fd' : '#e5e7eb',
+                    background: view === 'personnel' ? '#ede9fe' : '#fafafa',
+                    fontWeight: 600, cursor: 'pointer', fontSize: 13,
+                  }}
+                >
+                  Personnel Files
+                </button>
+                <button
+                  onClick={() => navigate('/personnel/compliance')}
+                  style={{
+                    textAlign: 'left', padding: '9px 14px', borderRadius: 8, border: '1px solid',
+                    borderColor: view === 'requirements' ? '#c4b5fd' : '#e5e7eb',
+                    background: view === 'requirements' ? '#ede9fe' : '#fafafa',
+                    fontWeight: 600, cursor: 'pointer', fontSize: 13,
+                  }}
+                >
+                  Compliance
+                </button>
+                <button
+                  onClick={() => navigate('/personnel/hours')}
+                  style={{
+                    textAlign: 'left', padding: '9px 14px', borderRadius: 8, border: '1px solid',
+                    borderColor: view === 'intern-hours' ? '#c4b5fd' : '#e5e7eb',
+                    background: view === 'intern-hours' ? '#ede9fe' : '#fafafa',
+                    fontWeight: 600, cursor: 'pointer', fontSize: 13,
+                  }}
+                >
+                  Intern Hours
+                </button>
+              </div>
+            )}
+          </div>
 
           <button
             onClick={() => navigate('/availability')}
@@ -1841,22 +1887,6 @@ function AdminApp({ signOut, intakes, setIntakes, providerProfiles, setProviderP
             }}
           >
             Availability
-          </button>
-
-          <button
-            onClick={() => navigate('/hours')}
-            style={{
-              textAlign: 'left',
-              padding: '12px 14px',
-              borderRadius: 10,
-              border: '1px solid',
-              borderColor: view === 'intern-hours' ? '#c4b5fd' : '#e5e7eb',
-              background: view === 'intern-hours' ? '#f5f3ff' : '#fff',
-              fontWeight: 600,
-              cursor: 'pointer',
-            }}
-          >
-            Intern Hours
           </button>
 
           <button
@@ -1897,6 +1927,8 @@ function AdminApp({ signOut, intakes, setIntakes, providerProfiles, setProviderP
       <div style={{ minWidth: 0 }}>
         {view === 'providers' ? (
           <ProvidersPage />
+        ) : view === 'personnel-hub' ? (
+          <PersonnelHubPage />
         ) : view === 'personnel' ? (
           <PersonnelFilesPage />
         ) : view === 'requirements' ? (

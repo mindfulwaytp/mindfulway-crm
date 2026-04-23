@@ -1,10 +1,14 @@
 import { useState, useEffect, useRef } from 'react';
+import { ref as storageRef, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { storage } from '../lib/firebase';
 import { fetchProviderProfiles } from '../lib/providersProfileApi';
 import {
   fetchPersonnelRecords,
   addPersonnelRecord,
   updatePersonnelRecord,
   deletePersonnelRecord,
+  fetchCeuSettings,
+  saveCeuSettings,
 } from '../lib/personnelApi';
 import {
   fetchRequirements,
@@ -17,11 +21,10 @@ import {
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const TABS = [
+  { id: 'compliance', label: 'Compliance' },
   { id: 'credentials', label: 'Credentials' },
-  { id: 'ceus', label: 'CEUs' },
   { id: 'trainings', label: 'Trainings' },
   { id: 'contracts', label: 'Contracts' },
-  { id: 'compliance', label: 'Compliance' },
 ];
 
 const CREDENTIAL_TYPES = [
@@ -31,9 +34,9 @@ const CREDENTIAL_TYPES = [
 ];
 
 const CEU_CATEGORIES = [
-  'Ethics', 'Clinical Skills', 'Cultural Competency',
-  'Suicide Prevention', 'Trauma', 'Substance Use',
-  'Child/Adolescent', 'Supervision', 'Other',
+  'Clinical Skills', 'Cultural Competency',
+  'Trauma', 'Substance Use',
+  'Child/Adolescent', 'Supervision', 'Other (note below)',
 ];
 
 const TRAINING_NAMES = [
@@ -52,7 +55,6 @@ const CONTRACT_STATUSES = ['Active', 'Pending Signature', 'Expired', 'Terminated
 
 const EMPTY_FORMS = {
   credentials: { licenseType: '', licenseNumber: '', state: 'WA', issueDate: '', expirationDate: '', notes: '' },
-  ceus: { title: '', organization: '', hours: '', category: '', completionDate: '', cycleLabel: '', notes: '' },
   trainings: { name: '', category: '', completionDate: '', expirationDate: '', certificateUrl: '', notes: '' },
   contracts: { type: '', title: '', startDate: '', endDate: '', status: 'Active', documentUrl: '', notes: '' },
 };
@@ -94,8 +96,29 @@ function formatDate(str) {
   return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
+function toDateStr(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+// Returns { start: Date, end: Date } for the cycle that contains today
+function getCurrentCycle(startDateStr, cycleMonths) {
+  if (!startDateStr || !cycleMonths) return null;
+  const [sy, sm, sd] = startDateStr.split('-').map(Number);
+  let cycleStart = new Date(sy, sm - 1, sd);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  for (let i = 0; i < 100; i++) {
+    const cycleEnd = new Date(cycleStart);
+    cycleEnd.setMonth(cycleEnd.getMonth() + Number(cycleMonths));
+    cycleEnd.setDate(cycleEnd.getDate() - 1);
+    if (cycleEnd >= today) return { start: cycleStart, end: cycleEnd };
+    cycleStart = new Date(cycleStart);
+    cycleStart.setMonth(cycleStart.getMonth() + Number(cycleMonths));
+  }
+  return null;
+}
+
 function providerComplianceStatus(records) {
-  // records: { credentials, trainings } — checks both for expired/expiring items
   const items = [
     ...(records.credentials || []).map((r) => r.expirationDate),
     ...(records.trainings || []).map((r) => r.expirationDate),
@@ -122,9 +145,9 @@ const inputStyle = {
 
 const selectStyle = { ...inputStyle, cursor: 'pointer' };
 
-function Field({ label, children, half }) {
+function Field({ label, children }) {
   return (
-    <div style={half ? {} : {}}>
+    <div>
       <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 4 }}>{label}</div>
       {children}
     </div>
@@ -154,43 +177,6 @@ function CredentialForm({ draft, onChange }) {
       <Field label="Expiration Date">
         <input type="date" value={draft.expirationDate} onChange={(e) => onChange('expirationDate', e.target.value)} style={inputStyle} />
       </Field>
-      <div style={{ gridColumn: '1 / -1' }}>
-        <Field label="Notes">
-          <textarea value={draft.notes} onChange={(e) => onChange('notes', e.target.value)} rows={2} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
-        </Field>
-      </div>
-    </div>
-  );
-}
-
-function CeuForm({ draft, onChange }) {
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-      <div style={{ gridColumn: '1 / -1' }}>
-        <Field label="Course Title">
-          <input value={draft.title} onChange={(e) => onChange('title', e.target.value)} placeholder="e.g. Trauma-Focused CBT" style={inputStyle} />
-        </Field>
-      </div>
-      <Field label="Provider / Organization">
-        <input value={draft.organization} onChange={(e) => onChange('organization', e.target.value)} placeholder="e.g. NASW" style={inputStyle} />
-      </Field>
-      <Field label="CEU Hours">
-        <input type="number" min="0" step="0.5" value={draft.hours} onChange={(e) => onChange('hours', e.target.value)} placeholder="e.g. 3" style={inputStyle} />
-      </Field>
-      <Field label="Category">
-        <select value={draft.category} onChange={(e) => onChange('category', e.target.value)} style={selectStyle}>
-          <option value="">— Select —</option>
-          {CEU_CATEGORIES.map((c) => <option key={c}>{c}</option>)}
-        </select>
-      </Field>
-      <Field label="Completion Date">
-        <input type="date" value={draft.completionDate} onChange={(e) => onChange('completionDate', e.target.value)} style={inputStyle} />
-      </Field>
-      <div style={{ gridColumn: '1 / -1' }}>
-        <Field label="License Renewal Cycle (optional)">
-          <input value={draft.cycleLabel} onChange={(e) => onChange('cycleLabel', e.target.value)} placeholder="e.g. LMFT 2024–2026" style={inputStyle} />
-        </Field>
-      </div>
       <div style={{ gridColumn: '1 / -1' }}>
         <Field label="Notes">
           <textarea value={draft.notes} onChange={(e) => onChange('notes', e.target.value)} rows={2} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
@@ -315,30 +301,6 @@ function CredentialCard({ record, onEdit, onDelete, deleting }) {
   );
 }
 
-function CeuCard({ record, onEdit, onDelete, deleting }) {
-  return (
-    <RecordCard onEdit={onEdit} onDelete={onDelete} deleting={deleting}>
-      <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>{record.title || 'CEU Record'}</div>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
-        {record.hours && (
-          <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 20, background: '#ede9fe', color: '#6d28d9', border: '1px solid #c4b5fd', fontWeight: 600 }}>
-            {record.hours} hrs
-          </span>
-        )}
-        {record.category && (
-          <span style={{ fontSize: 12, padding: '2px 8px', borderRadius: 20, background: '#f0f9ff', color: '#0369a1', border: '1px solid #bae6fd', fontWeight: 500 }}>
-            {record.category}
-          </span>
-        )}
-      </div>
-      <CardRow label="Organization" value={record.organization} />
-      <CardRow label="Completed" value={formatDate(record.completionDate)} />
-      <CardRow label="Cycle" value={record.cycleLabel} />
-      {record.notes && <div style={{ fontSize: 12, color: '#6b7280', marginTop: 6, fontStyle: 'italic' }}>{record.notes}</div>}
-    </RecordCard>
-  );
-}
-
 function TrainingCard({ record, onEdit, onDelete, deleting }) {
   return (
     <RecordCard onEdit={onEdit} onDelete={onDelete} deleting={deleting}>
@@ -402,12 +364,6 @@ const TAB_CONFIG = {
     emptyMsg: 'No credentials on file. Add a license or certification to get started.',
     FormComponent: CredentialForm,
     CardComponent: CredentialCard,
-  },
-  ceus: {
-    label: 'CEUs',
-    emptyMsg: 'No CEU records yet. Add a completed continuing education course.',
-    FormComponent: CeuForm,
-    CardComponent: CeuCard,
   },
   trainings: {
     label: 'Trainings',
@@ -494,7 +450,6 @@ function TabPanel({
 
   return (
     <div>
-      {/* Add button */}
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
         {!showForm && (
           <button
@@ -506,7 +461,6 @@ function TabPanel({
         )}
       </div>
 
-      {/* Add / Edit form */}
       {showForm && (
         <div style={{ background: '#f5f3ff', border: '1px solid #c4b5fd', borderRadius: 12, padding: '20px', marginBottom: 20 }}>
           <div style={{ fontWeight: 700, fontSize: 14, color: '#6d28d9', marginBottom: 16 }}>
@@ -537,7 +491,6 @@ function TabPanel({
         </div>
       )}
 
-      {/* Records list */}
       {loading ? (
         <div style={{ color: '#9ca3af', fontSize: 13, padding: '24px 0' }}>Loading…</div>
       ) : records.length === 0 ? (
@@ -553,6 +506,315 @@ function TabPanel({
               deleting={deletingId === record.id}
             />
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── CEU Tracker (inside Compliance tab) ──────────────────────────────────────
+
+const EMPTY_SETTINGS_DRAFT = { requiredHours: '', cycleMonths: '12', cycleStartDate: '' };
+const EMPTY_CEU_RECORD = { title: '', organization: '', hours: '', category: '', completionDate: '', notes: '' };
+
+function CeuProgressSection({ providerName, settings, records, reqContributions = [], onSettingsSave, onRecordAdd, onRecordDelete }) {
+  const [editingSettings, setEditingSettings] = useState(false);
+  const [settingsDraft, setSettingsDraft] = useState(EMPTY_SETTINGS_DRAFT);
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [recordDraft, setRecordDraft] = useState(EMPTY_CEU_RECORD);
+  const [proofFile, setProofFile] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+
+  function openSettingsEdit() {
+    setSettingsDraft({
+      requiredHours: settings?.requiredHours ?? '',
+      cycleMonths: String(settings?.cycleMonths ?? '12'),
+      cycleStartDate: settings?.cycleStartDate ?? '',
+    });
+    setEditingSettings(true);
+  }
+
+  async function handleSettingsSave() {
+    setSaving(true);
+    try {
+      const s = {
+        requiredHours: Number(settingsDraft.requiredHours),
+        cycleMonths: Number(settingsDraft.cycleMonths),
+        cycleStartDate: settingsDraft.cycleStartDate,
+      };
+      await onSettingsSave(s);
+      setEditingSettings(false);
+    } catch (e) { console.error(e); }
+    finally { setSaving(false); }
+  }
+
+  async function handleRecordAdd() {
+    setSaving(true);
+    try {
+      let proofUrl = '';
+      if (proofFile) {
+        const fileRef = storageRef(storage, `ceu-proofs/${providerName}/${Date.now()}-${proofFile.name}`);
+        await uploadBytes(fileRef, proofFile);
+        proofUrl = await getDownloadURL(fileRef);
+      }
+      await onRecordAdd({ ...recordDraft, proofUrl });
+      setShowAddForm(false);
+      setRecordDraft(EMPTY_CEU_RECORD);
+      setProofFile(null);
+    } catch (e) { console.error(e); }
+    finally { setSaving(false); }
+  }
+
+  async function handleRecordDelete(id) {
+    if (!window.confirm('Delete this CEU record?')) return;
+    setDeletingId(id);
+    try { await onRecordDelete(id); }
+    catch (e) { console.error(e); }
+    finally { setDeletingId(null); }
+  }
+
+  const cycle = settings?.cycleStartDate ? getCurrentCycle(settings.cycleStartDate, settings.cycleMonths) : null;
+  const cycleRecords = cycle
+    ? records.filter((r) => r.completionDate >= toDateStr(cycle.start) && r.completionDate <= toDateStr(cycle.end))
+    : records;
+  const cycleReqContributions = cycle
+    ? reqContributions.filter((c) => c.completedDate >= toDateStr(cycle.start) && c.completedDate <= toDateStr(cycle.end))
+    : reqContributions;
+  const totalHours =
+    cycleRecords.reduce((sum, r) => sum + (parseFloat(r.hours) || 0), 0) +
+    cycleReqContributions.reduce((sum, c) => sum + (parseFloat(c.hours) || 0), 0);
+  const requiredHours = settings?.requiredHours || 0;
+  const pct = requiredHours > 0 ? Math.min(100, (totalHours / requiredHours) * 100) : 0;
+  const progressColor = pct >= 100 ? '#10b981' : pct >= 50 ? '#f59e0b' : '#ef4444';
+  const cycleLabel = settings?.cycleMonths === 12 ? 'Annual' : settings?.cycleMonths ? `Every ${settings.cycleMonths / 12} years` : '';
+
+  return (
+    <div style={{ background: '#f5f3ff', border: '1px solid #c4b5fd', borderRadius: 12, padding: '20px', marginBottom: 24 }}>
+      {/* Header row */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: settings || editingSettings ? 16 : 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontWeight: 700, fontSize: 15, color: '#6d28d9' }}>CEU Tracker</span>
+          {settings?.requiredHours && !editingSettings && (
+            <span style={{ fontSize: 12, color: '#8b5cf6', padding: '2px 8px', background: '#ede9fe', borderRadius: 20, border: '1px solid #c4b5fd' }}>
+              {settings.requiredHours} hrs · {cycleLabel}
+            </span>
+          )}
+        </div>
+        {!editingSettings && (
+          <button
+            onClick={openSettingsEdit}
+            style={{ padding: '4px 12px', borderRadius: 6, border: '1px solid #c4b5fd', background: '#fff', color: '#7c3aed', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+          >
+            {settings?.requiredHours ? 'Edit Settings' : 'Set Up CEU Requirement'}
+          </button>
+        )}
+      </div>
+
+      {/* Settings edit form */}
+      {editingSettings && (
+        <div style={{ background: '#fff', borderRadius: 10, padding: 16, marginBottom: 16, border: '1px solid #e5e7eb' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 4 }}>Required CEU Hours</div>
+              <input
+                type="number" min="0" step="0.5"
+                value={settingsDraft.requiredHours}
+                onChange={(e) => setSettingsDraft((d) => ({ ...d, requiredHours: e.target.value }))}
+                placeholder="e.g. 36" style={inputStyle}
+              />
+            </div>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 4 }}>Cycle Length</div>
+              <select
+                value={settingsDraft.cycleMonths}
+                onChange={(e) => setSettingsDraft((d) => ({ ...d, cycleMonths: e.target.value }))}
+                style={selectStyle}
+              >
+                <option value="12">Annually (1 year)</option>
+                <option value="24">Every 2 years</option>
+                <option value="36">Every 3 years</option>
+              </select>
+            </div>
+            <div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 4 }}>Cycle Start Date</div>
+              <input
+                type="date"
+                value={settingsDraft.cycleStartDate}
+                onChange={(e) => setSettingsDraft((d) => ({ ...d, cycleStartDate: e.target.value }))}
+                style={inputStyle}
+              />
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={handleSettingsSave} disabled={saving}
+              style={{ padding: '7px 16px', borderRadius: 8, border: 'none', background: saving ? '#a78bfa' : '#7c3aed', color: '#fff', fontWeight: 700, fontSize: 13, cursor: saving ? 'default' : 'pointer' }}
+            >
+              {saving ? 'Saving…' : 'Save Settings'}
+            </button>
+            <button
+              onClick={() => setEditingSettings(false)}
+              style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {settings?.requiredHours && !editingSettings ? (
+        <>
+          {/* Progress bar */}
+          <div style={{ marginBottom: 16 }}>
+            {cycle && (
+              <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>
+                Current cycle: <strong>{formatDate(toDateStr(cycle.start))}</strong> — <strong>{formatDate(toDateStr(cycle.end))}</strong>
+              </div>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ flex: 1, background: '#e5e7eb', borderRadius: 99, height: 10, overflow: 'hidden' }}>
+                <div style={{ width: `${pct}%`, height: '100%', background: progressColor, borderRadius: 99, transition: 'width 0.3s' }} />
+              </div>
+              <span style={{ fontSize: 13, fontWeight: 700, color: progressColor, whiteSpace: 'nowrap' }}>
+                {totalHours.toFixed(1)} / {requiredHours} hrs
+              </span>
+            </div>
+          </div>
+
+          {/* Records list */}
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: '#374151' }}>
+                CEU Records{cycle ? ' (this cycle)' : ''}
+              </div>
+              {!showAddForm && (
+                <button
+                  onClick={() => setShowAddForm(true)}
+                  style={{ padding: '4px 12px', borderRadius: 6, border: '1px solid #c4b5fd', background: '#fff', color: '#7c3aed', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
+                >
+                  + Add CEU
+                </button>
+              )}
+            </div>
+
+            {showAddForm && (
+              <div style={{ background: '#fff', borderRadius: 10, padding: 16, marginBottom: 12, border: '1px solid #e5e7eb' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 4 }}>Course Title</div>
+                    <input value={recordDraft.title} onChange={(e) => setRecordDraft((d) => ({ ...d, title: e.target.value }))} placeholder="e.g. Trauma-Focused CBT" style={inputStyle} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 4 }}>Provider / Organization</div>
+                    <input value={recordDraft.organization} onChange={(e) => setRecordDraft((d) => ({ ...d, organization: e.target.value }))} placeholder="e.g. NASW" style={inputStyle} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 4 }}>CEU Hours</div>
+                    <input type="number" min="0" step="0.5" value={recordDraft.hours} onChange={(e) => setRecordDraft((d) => ({ ...d, hours: e.target.value }))} placeholder="e.g. 3" style={inputStyle} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 4 }}>Category</div>
+                    <select value={recordDraft.category} onChange={(e) => setRecordDraft((d) => ({ ...d, category: e.target.value }))} style={selectStyle}>
+                      <option value="">— Select —</option>
+                      {CEU_CATEGORIES.map((c) => <option key={c}>{c}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 4 }}>Completion Date</div>
+                    <input type="date" value={recordDraft.completionDate} onChange={(e) => setRecordDraft((d) => ({ ...d, completionDate: e.target.value }))} style={inputStyle} />
+                  </div>
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 4 }}>Notes</div>
+                    <textarea value={recordDraft.notes} onChange={(e) => setRecordDraft((d) => ({ ...d, notes: e.target.value }))} rows={2} style={{ ...inputStyle, resize: 'vertical', fontFamily: 'inherit' }} />
+                  </div>
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 4 }}>Proof / Certificate (PDF)</div>
+                    <input
+                      type="file" accept=".pdf,application/pdf"
+                      onChange={(e) => setProofFile(e.target.files[0] || null)}
+                      style={{ fontSize: 13, color: '#374151' }}
+                    />
+                    {proofFile && (
+                      <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>{proofFile.name}</div>
+                    )}
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button onClick={handleRecordAdd} disabled={saving} style={{ padding: '7px 16px', borderRadius: 8, border: 'none', background: saving ? '#a78bfa' : '#7c3aed', color: '#fff', fontWeight: 700, fontSize: 13, cursor: saving ? 'default' : 'pointer' }}>
+                    {saving ? 'Uploading…' : 'Save'}
+                  </button>
+                  <button onClick={() => { setShowAddForm(false); setProofFile(null); }} style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {cycleRecords.length === 0 && cycleReqContributions.length === 0 ? (
+              <div style={{ fontSize: 13, color: '#9ca3af', textAlign: 'center', padding: '12px 0' }}>
+                No CEU records for this cycle yet.
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {/* Requirement-based CEU completions (auto-counted, read-only) */}
+                {cycleReqContributions.map((c) => (
+                  <div key={c.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fff', borderRadius: 8, padding: '10px 14px', border: '1px solid #e5e7eb' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+                        <span style={{ fontWeight: 600, fontSize: 13 }}>{c.name}</span>
+                        <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 20, background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', fontWeight: 600 }}>
+                          from requirements
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 3 }}>
+                        {c.hours > 0 && (
+                          <span style={{ fontSize: 12, padding: '1px 7px', borderRadius: 20, background: '#ede9fe', color: '#6d28d9', border: '1px solid #c4b5fd', fontWeight: 600 }}>
+                            {c.hours} hrs
+                          </span>
+                        )}
+                        <span style={{ fontSize: 12, color: '#6b7280' }}>{formatDate(c.completedDate)}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {/* Manually added CEU records */}
+                {cycleRecords.map((r) => (
+                  <div key={r.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#fff', borderRadius: 8, padding: '10px 14px', border: '1px solid #e5e7eb' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 600, fontSize: 13 }}>{r.title || 'Untitled'}</div>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 3 }}>
+                        {r.hours && (
+                          <span style={{ fontSize: 12, padding: '1px 7px', borderRadius: 20, background: '#ede9fe', color: '#6d28d9', border: '1px solid #c4b5fd', fontWeight: 600 }}>
+                            {r.hours} hrs
+                          </span>
+                        )}
+                        {r.category && <span style={{ fontSize: 12, color: '#6b7280' }}>{r.category}</span>}
+                        {r.completionDate && <span style={{ fontSize: 12, color: '#6b7280' }}>{formatDate(r.completionDate)}</span>}
+                        {r.organization && <span style={{ fontSize: 12, color: '#6b7280' }}>{r.organization}</span>}
+                        {r.proofUrl && (
+                          <a href={r.proofUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: '#7c3aed', fontWeight: 600 }}>
+                            View PDF →
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => handleRecordDelete(r.id)}
+                      disabled={deletingId === r.id}
+                      style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #fca5a5', background: '#fff', color: '#dc2626', fontSize: 12, fontWeight: 600, cursor: deletingId === r.id ? 'default' : 'pointer', flexShrink: 0, marginLeft: 12 }}
+                    >
+                      {deletingId === r.id ? '…' : 'Delete'}
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      ) : !editingSettings && (
+        <div style={{ fontSize: 13, color: '#9ca3af', textAlign: 'center', padding: '8px 0' }}>
+          No CEU requirement configured. Click "Set Up CEU Requirement" to get started.
         </div>
       )}
     </div>
@@ -593,7 +855,7 @@ function getCellStatus(req, completion) {
 
 function recurrenceLabel(months) {
   if (months === null || months === undefined) return 'One-time';
-  const map = { 6: 'Every 6 months', 12: 'Annually', 24: 'Every 2 years', 36: 'Every 3 years', 60: 'Every 5 years' };
+  const map = { 6: 'Every 6 months', 12: 'Annually', 24: 'Every 2 years', 36: 'Every 3 years', 48: 'Every 4 years', 72: 'Every 6 years' };
   return map[months] || `Every ${months} months`;
 }
 
@@ -601,23 +863,15 @@ function todayStr() {
   return new Date().toISOString().split('T')[0];
 }
 
-function ComplianceTabContent({ data, loading, onSave, onClear }) {
+// Reusable list of requirement rows with inline completion forms.
+// Used in the Compliance tab (non-Training reqs) and Trainings tab (Training reqs).
+function RequirementList({ providerName, reqs, completions, onSave, onClear }) {
   const [activeReqId, setActiveReqId] = useState(null);
   const [form, setForm] = useState({ lastCompletedDate: '', documentUrl: '', notes: '' });
+  const [reqProofFile, setReqProofFile] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  if (loading) return <div style={{ color: '#9ca3af', fontSize: 13, padding: '24px 0' }}>Loading…</div>;
-  if (!data) return null;
-
-  const { reqs, completions } = data;
-
-  if (reqs.length === 0) {
-    return (
-      <div style={{ color: '#9ca3af', fontSize: 13, padding: '32px 0', textAlign: 'center' }}>
-        No requirements are assigned to this provider. Define requirements in the Requirements page.
-      </div>
-    );
-  }
+  if (reqs.length === 0) return null;
 
   function openForm(req) {
     const existing = completions[req.id];
@@ -626,14 +880,22 @@ function ComplianceTabContent({ data, loading, onSave, onClear }) {
       documentUrl: existing?.documentUrl || '',
       notes: existing?.notes || '',
     });
+    setReqProofFile(null);
     setActiveReqId(req.id);
   }
 
   async function handleSave(req) {
     setSaving(true);
     try {
+      let { documentUrl } = form;
+      if (reqProofFile) {
+        const fileRef = storageRef(storage, `requirement-proofs/${providerName}/${req.id}/${Date.now()}-${reqProofFile.name}`);
+        await uploadBytes(fileRef, reqProofFile);
+        documentUrl = await getDownloadURL(fileRef);
+      }
       const nextDueDate = calcNextDue(form.lastCompletedDate, req.recurrenceMonths);
-      await onSave(req.id, { ...form, nextDueDate });
+      await onSave(req.id, { ...form, documentUrl, nextDueDate });
+      setReqProofFile(null);
       setActiveReqId(null);
     } catch (e) { console.error(e); }
     finally { setSaving(false); }
@@ -659,7 +921,6 @@ function ComplianceTabContent({ data, loading, onSave, onClear }) {
 
         return (
           <div key={req.id} style={{ background: '#fafafa', border: `1px solid ${isOpen ? '#c4b5fd' : '#e5e7eb'}`, borderRadius: 10, overflow: 'hidden' }}>
-            {/* Row */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 16px' }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
@@ -696,7 +957,7 @@ function ComplianceTabContent({ data, loading, onSave, onClear }) {
                   {ss.label}
                 </span>
                 <button
-                  onClick={() => isOpen ? setActiveReqId(null) : openForm(req)}
+                  onClick={() => { if (isOpen) { setActiveReqId(null); setReqProofFile(null); } else { openForm(req); } }}
                   style={{ padding: '5px 12px', borderRadius: 6, border: '1px solid #d1d5db', background: isOpen ? '#f3f4f6' : '#fff', color: '#374151', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
                 >
                   {isOpen ? 'Cancel' : (completion?.lastCompletedDate ? 'Update' : 'Log Completion')}
@@ -704,7 +965,6 @@ function ComplianceTabContent({ data, loading, onSave, onClear }) {
               </div>
             </div>
 
-            {/* Inline form */}
             {isOpen && (
               <div style={{ padding: '16px 20px', borderTop: '1px solid #ede9fe', background: '#f5f3ff', display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
@@ -717,12 +977,20 @@ function ComplianceTabContent({ data, loading, onSave, onClear }) {
                     />
                   </div>
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 4 }}>Document / Certificate URL</div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 4 }}>Proof / Certificate (PDF)</div>
                     <input
-                      type="url" value={form.documentUrl}
-                      onChange={(e) => setForm((f) => ({ ...f, documentUrl: e.target.value }))}
-                      placeholder="https://…" style={inputStyle}
+                      type="file" accept=".pdf,application/pdf"
+                      onChange={(e) => setReqProofFile(e.target.files[0] || null)}
+                      style={{ fontSize: 13, color: '#374151', width: '100%' }}
                     />
+                    {reqProofFile && (
+                      <div style={{ fontSize: 12, color: '#6b7280', marginTop: 4 }}>{reqProofFile.name}</div>
+                    )}
+                    {!reqProofFile && form.documentUrl && (
+                      <div style={{ fontSize: 12, marginTop: 4 }}>
+                        Current: <a href={form.documentUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#7c3aed', fontWeight: 600 }}>View existing →</a>
+                      </div>
+                    )}
                   </div>
                   <div style={{ gridColumn: '1 / -1' }}>
                     <div style={{ fontSize: 12, fontWeight: 600, color: '#6b7280', marginBottom: 4 }}>Notes</div>
@@ -763,27 +1031,81 @@ function ComplianceTabContent({ data, loading, onSave, onClear }) {
   );
 }
 
+function ComplianceTabContent({
+  providerName, data, loading, onSave, onClear,
+  ceuSettings, ceuRecords,
+  onCeuSettingsSave, onCeuRecordAdd, onCeuRecordDelete,
+}) {
+  if (loading) return <div style={{ color: '#9ca3af', fontSize: 13, padding: '24px 0' }}>Loading…</div>;
+
+  const allReqs = data?.reqs ?? [];
+  const completions = data?.completions ?? {};
+
+  // Training-type reqs go to the Trainings tab — exclude them here
+  const reqs = allReqs.filter((r) => r.type !== 'Training');
+
+  // CEU-type requirements with logged completions — auto-counted toward the CEU tracker
+  const ceuReqContributions = reqs
+    .filter((r) => r.type === 'CEU' && completions[r.id]?.lastCompletedDate)
+    .map((r) => ({
+      id: r.id,
+      name: r.name,
+      hours: r.ceuHours || 0,
+      completedDate: completions[r.id].lastCompletedDate,
+    }));
+
+  return (
+    <div>
+      {/* CEU tracker always shown at top */}
+      <CeuProgressSection
+        providerName={providerName}
+        settings={ceuSettings}
+        records={ceuRecords}
+        reqContributions={ceuReqContributions}
+        onSettingsSave={onCeuSettingsSave}
+        onRecordAdd={onCeuRecordAdd}
+        onRecordDelete={onCeuRecordDelete}
+      />
+
+      {/* State-mandated requirements (non-Training) */}
+      {reqs.length === 0 ? (
+        <div style={{ color: '#9ca3af', fontSize: 13, padding: '16px 0', textAlign: 'center' }}>
+          No requirements are assigned to this provider. Define requirements in the Requirements page.
+        </div>
+      ) : (
+        <RequirementList
+          providerName={providerName}
+          reqs={reqs}
+          completions={completions}
+          onSave={onSave}
+          onClear={onClear}
+        />
+      )}
+    </div>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-export default function PersonnelFilesPage() {
+export default function PersonnelFilesPage({ lockedProvider = null }) {
   const [providers, setProviders] = useState([]);
-  const [loadingProviders, setLoadingProviders] = useState(true);
-  const [selectedProvider, setSelectedProvider] = useState(null);
-  const [activeTab, setActiveTab] = useState('credentials');
+  const [loadingProviders, setLoadingProviders] = useState(!lockedProvider);
+  const [selectedProvider, setSelectedProvider] = useState(lockedProvider);
+  const [activeTab, setActiveTab] = useState('compliance');
 
-  // records per provider: { [providerName]: { credentials, ceus, trainings, contracts } }
+  // records per provider: { [providerName]: { credentials, trainings, contracts } }
   const [allRecords, setAllRecords] = useState({});
   const [loadingTab, setLoadingTab] = useState(false);
-  // tracks which (provider, tab) pairs have already been fetched — ref avoids dep-array issues
   const fetchedRef = useRef({});
 
-  // compliance: { [providerName]: { reqs: [], completions: { [reqId]: completion|null } } }
+  // compliance: { [providerName]: { reqs, completions, ceuSettings, ceuRecords } }
   const [complianceData, setComplianceData] = useState({});
   const [loadingCompliance, setLoadingCompliance] = useState(false);
   const compFetchedRef = useRef(new Set());
 
-  // ── Load providers ──────────────────────────────────────────────────────────
+  // ── Load providers (admin only — skip when locked to a single provider) ──────
   useEffect(() => {
+    if (lockedProvider) return;
     fetchProviderProfiles()
       .then((data) => {
         const sorted = data.map((p) => p.name).sort();
@@ -791,11 +1113,11 @@ export default function PersonnelFilesPage() {
       })
       .catch(console.error)
       .finally(() => setLoadingProviders(false));
-  }, []);
+  }, [lockedProvider]);
 
   // ── Load tab records when tab/provider changes ──────────────────────────────
   useEffect(() => {
-    if (!selectedProvider || !activeTab) return;
+    if (!selectedProvider || !activeTab || activeTab === 'compliance') return;
     if (fetchedRef.current[selectedProvider]?.has(activeTab)) return;
 
     let cancelled = false;
@@ -825,16 +1147,20 @@ export default function PersonnelFilesPage() {
     return () => { cancelled = true; };
   }, [selectedProvider, activeTab]);
 
-  // ── Load compliance data when compliance tab is opened ─────────────────────
+  // ── Load compliance + CEU data when compliance or trainings tab opened ───────
   useEffect(() => {
-    if (!selectedProvider || activeTab !== 'compliance') return;
+    if (!selectedProvider || (activeTab !== 'compliance' && activeTab !== 'trainings')) return;
     if (compFetchedRef.current.has(selectedProvider)) return;
 
     let cancelled = false;
     async function load() {
       setLoadingCompliance(true);
       try {
-        const allReqs = await fetchRequirements();
+        const [allReqs, ceuSettings, ceuRecords] = await Promise.all([
+          fetchRequirements(),
+          fetchCeuSettings(selectedProvider),
+          fetchPersonnelRecords(selectedProvider, 'ceus'),
+        ]);
         const applicable = allReqs.filter((r) =>
           r.appliesTo === 'all' || (Array.isArray(r.appliesTo) && r.appliesTo.includes(selectedProvider))
         );
@@ -844,7 +1170,10 @@ export default function PersonnelFilesPage() {
         if (cancelled) return;
         const completions = {};
         applicable.forEach((r, i) => { completions[r.id] = results[i]; });
-        setComplianceData((prev) => ({ ...prev, [selectedProvider]: { reqs: applicable, completions } }));
+        setComplianceData((prev) => ({
+          ...prev,
+          [selectedProvider]: { reqs: applicable, completions, ceuSettings, ceuRecords },
+        }));
         compFetchedRef.current.add(selectedProvider);
       } catch (e) {
         console.error(e);
@@ -858,7 +1187,7 @@ export default function PersonnelFilesPage() {
 
   function selectProvider(name) {
     setSelectedProvider(name);
-    setActiveTab('credentials');
+    setActiveTab('compliance');
   }
 
   // ── Record mutations ────────────────────────────────────────────────────────
@@ -886,6 +1215,17 @@ export default function PersonnelFilesPage() {
     }));
   }
 
+  async function handleDelete(tabId, recordId) {
+    await deletePersonnelRecord(selectedProvider, tabId, recordId);
+    setAllRecords((prev) => ({
+      ...prev,
+      [selectedProvider]: {
+        ...(prev[selectedProvider] || {}),
+        [tabId]: (prev[selectedProvider]?.[tabId] || []).filter((r) => r.id !== recordId),
+      },
+    }));
+  }
+
   async function handleComplianceSave(reqId, data) {
     await setCompletionApi(reqId, selectedProvider, data);
     setComplianceData((prev) => ({
@@ -908,13 +1248,32 @@ export default function PersonnelFilesPage() {
     }));
   }
 
-  async function handleDelete(tabId, recordId) {
-    await deletePersonnelRecord(selectedProvider, tabId, recordId);
-    setAllRecords((prev) => ({
+  async function handleCeuSettingsSave(settings) {
+    await saveCeuSettings(selectedProvider, settings);
+    setComplianceData((prev) => ({
+      ...prev,
+      [selectedProvider]: { ...prev[selectedProvider], ceuSettings: settings },
+    }));
+  }
+
+  async function handleCeuRecordAdd(data) {
+    const id = await addPersonnelRecord(selectedProvider, 'ceus', data);
+    setComplianceData((prev) => ({
       ...prev,
       [selectedProvider]: {
-        ...(prev[selectedProvider] || {}),
-        [tabId]: (prev[selectedProvider]?.[tabId] || []).filter((r) => r.id !== recordId),
+        ...prev[selectedProvider],
+        ceuRecords: [...(prev[selectedProvider]?.ceuRecords || []), { id, ...data }],
+      },
+    }));
+  }
+
+  async function handleCeuRecordDelete(recordId) {
+    await deletePersonnelRecord(selectedProvider, 'ceus', recordId);
+    setComplianceData((prev) => ({
+      ...prev,
+      [selectedProvider]: {
+        ...prev[selectedProvider],
+        ceuRecords: (prev[selectedProvider]?.ceuRecords || []).filter((r) => r.id !== recordId),
       },
     }));
   }
@@ -922,7 +1281,6 @@ export default function PersonnelFilesPage() {
   const currentRecords = allRecords[selectedProvider] || {};
   const tabRecords = currentRecords[activeTab] || [];
 
-  // Compliance dot: only shown once both credentials and trainings are loaded
   function getProviderDot(name) {
     const r = allRecords[name];
     if (!r) return null;
@@ -941,41 +1299,43 @@ export default function PersonnelFilesPage() {
   return (
     <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
 
-      {/* ── Provider list (left) ─────────────────────────────────────── */}
-      <aside style={{
-        width: 220, flexShrink: 0, borderRight: '1px solid #e5e7eb',
-        overflowY: 'auto', padding: '24px 12px', background: '#fafafa',
-      }}>
-        <div style={{ fontWeight: 700, fontSize: 13, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12, paddingLeft: 4 }}>
-          Providers
-        </div>
-        {loadingProviders ? (
-          <div style={{ color: '#9ca3af', fontSize: 13, padding: '12px 4px' }}>Loading…</div>
-        ) : (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-            {providers.map((name) => {
-              const active = selectedProvider === name;
-              return (
-                <button
-                  key={name}
-                  onClick={() => selectProvider(name)}
-                  style={{
-                    textAlign: 'left', padding: '9px 12px', borderRadius: 8,
-                    border: '1px solid', cursor: 'pointer', fontSize: 15, fontWeight: active ? 700 : 500,
-                    borderColor: active ? '#c4b5fd' : 'transparent',
-                    background: active ? '#ede9fe' : 'transparent',
-                    color: active ? '#6d28d9' : '#374151',
-                    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
-                  }}
-                >
-                  <span>{name}</span>
-                  {getProviderDot(name)}
-                </button>
-              );
-            })}
+      {/* ── Provider list (left — hidden when locked to a single provider) ── */}
+      {!lockedProvider && (
+        <aside style={{
+          width: 220, flexShrink: 0, borderRight: '1px solid #e5e7eb',
+          overflowY: 'auto', padding: '24px 12px', background: '#fafafa',
+        }}>
+          <div style={{ fontWeight: 700, fontSize: 13, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 12, paddingLeft: 4 }}>
+            Providers
           </div>
-        )}
-      </aside>
+          {loadingProviders ? (
+            <div style={{ color: '#9ca3af', fontSize: 13, padding: '12px 4px' }}>Loading…</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {providers.map((name) => {
+                const active = selectedProvider === name;
+                return (
+                  <button
+                    key={name}
+                    onClick={() => selectProvider(name)}
+                    style={{
+                      textAlign: 'left', padding: '9px 12px', borderRadius: 8,
+                      border: '1px solid', cursor: 'pointer', fontSize: 15, fontWeight: active ? 700 : 500,
+                      borderColor: active ? '#c4b5fd' : 'transparent',
+                      background: active ? '#ede9fe' : 'transparent',
+                      color: active ? '#6d28d9' : '#374151',
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8,
+                    }}
+                  >
+                    <span>{name}</span>
+                    {getProviderDot(name)}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </aside>
+      )}
 
       {/* ── Detail panel (right) ─────────────────────────────────────── */}
       <div style={{ flex: 1, overflowY: 'auto', padding: '32px 36px' }}>
@@ -989,7 +1349,6 @@ export default function PersonnelFilesPage() {
           </div>
         ) : (
           <>
-            {/* Header */}
             <div style={{ marginBottom: 28 }}>
               <h2 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>{selectedProvider}</h2>
               <p style={{ margin: '4px 0 0', fontSize: 13, color: '#6b7280' }}>Personnel file — compliance tracking</p>
@@ -1004,7 +1363,7 @@ export default function PersonnelFilesPage() {
                 if (tab.id === 'compliance') {
                   const cd = complianceData[selectedProvider];
                   if (cd) {
-                    const issues = cd.reqs.filter((r) => {
+                    const issues = (cd.reqs || []).filter((r) => {
                       const s = getCellStatus(r, cd.completions[r.id]);
                       return s === 'missing' || s === 'expired' || s === 'expiring';
                     }).length;
@@ -1043,11 +1402,50 @@ export default function PersonnelFilesPage() {
             {activeTab === 'compliance' ? (
               <ComplianceTabContent
                 key={selectedProvider}
+                providerName={selectedProvider}
                 data={complianceData[selectedProvider]}
                 loading={loadingCompliance}
                 onSave={handleComplianceSave}
                 onClear={handleComplianceClear}
+                ceuSettings={complianceData[selectedProvider]?.ceuSettings ?? null}
+                ceuRecords={complianceData[selectedProvider]?.ceuRecords ?? []}
+                onCeuSettingsSave={handleCeuSettingsSave}
+                onCeuRecordAdd={handleCeuRecordAdd}
+                onCeuRecordDelete={handleCeuRecordDelete}
               />
+            ) : activeTab === 'trainings' ? (
+              <>
+                {/* Required Trainings from the requirements board shown above manual records */}
+                {(() => {
+                  const cd = complianceData[selectedProvider];
+                  const trainingReqs = (cd?.reqs ?? []).filter((r) => r.type === 'Training');
+                  if (loadingCompliance || trainingReqs.length === 0) return null;
+                  return (
+                    <div style={{ marginBottom: 28 }}>
+                      <div style={{ fontWeight: 700, fontSize: 13, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 10 }}>
+                        Required Trainings
+                      </div>
+                      <RequirementList
+                        key={selectedProvider}
+                        providerName={selectedProvider}
+                        reqs={trainingReqs}
+                        completions={cd?.completions ?? {}}
+                        onSave={handleComplianceSave}
+                        onClear={handleComplianceClear}
+                      />
+                    </div>
+                  );
+                })()}
+                <TabPanel
+                  key={`${selectedProvider}-${activeTab}`}
+                  tabId={activeTab}
+                  records={tabRecords}
+                  loading={loadingTab}
+                  onAdd={handleAdd}
+                  onUpdate={handleUpdate}
+                  onDelete={handleDelete}
+                />
+              </>
             ) : (
               <TabPanel
                 key={`${selectedProvider}-${activeTab}`}

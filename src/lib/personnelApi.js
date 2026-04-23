@@ -5,6 +5,8 @@ import {
   updateDoc,
   deleteDoc,
   doc,
+  getDoc,
+  setDoc,
   serverTimestamp,
 } from 'firebase/firestore';
 import { db } from './firebase';
@@ -35,4 +37,15 @@ export async function updatePersonnelRecord(providerName, type, id, data) {
 export async function deletePersonnelRecord(providerName, type, id) {
   const ref = doc(db, 'providers', providerName, type, id);
   await deleteDoc(ref);
+}
+
+// ── CEU settings (providers/{name}/config/ceu) ────────────────────────────────
+
+export async function fetchCeuSettings(providerName) {
+  const snap = await getDoc(doc(db, 'providers', providerName, 'config', 'ceu'));
+  return snap.exists() ? snap.data() : null;
+}
+
+export async function saveCeuSettings(providerName, settings) {
+  await setDoc(doc(db, 'providers', providerName, 'config', 'ceu'), settings, { merge: true });
 }

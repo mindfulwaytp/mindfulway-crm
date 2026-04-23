@@ -4,6 +4,7 @@ import {
   fetchCompletionsForReq, setCompletion, deleteCompletion, calcNextDue,
 } from '../lib/requirementsApi';
 import { fetchProviderProfiles } from '../lib/providersProfileApi';
+import { fetchCeuSettings, fetchPersonnelRecords } from '../lib/personnelApi';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -15,7 +16,8 @@ const RECURRENCE_OPTIONS = [
   { label: 'Annually', value: 12 },
   { label: 'Every 2 years', value: 24 },
   { label: 'Every 3 years', value: 36 },
-  { label: 'Every 5 years', value: 60 },
+  { label: 'Every 4 years', value: 48 },
+  { label: 'Every 6 years', value: 72 },
 ];
 
 const EMPTY_REQ_FORM = {
@@ -75,6 +77,27 @@ function recurrenceLabel(months) {
 
 function todayStr() {
   return new Date().toISOString().split('T')[0];
+}
+
+function toDateStr(d) {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function getCurrentCycle(startDateStr, cycleMonths) {
+  if (!startDateStr || !cycleMonths) return null;
+  const [sy, sm, sd] = startDateStr.split('-').map(Number);
+  let cycleStart = new Date(sy, sm - 1, sd);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  for (let i = 0; i < 100; i++) {
+    const cycleEnd = new Date(cycleStart);
+    cycleEnd.setMonth(cycleEnd.getMonth() + Number(cycleMonths));
+    cycleEnd.setDate(cycleEnd.getDate() - 1);
+    if (cycleEnd >= today) return { start: toDateStr(cycleStart), end: toDateStr(cycleEnd) };
+    cycleStart = new Date(cycleStart);
+    cycleStart.setMonth(cycleStart.getMonth() + Number(cycleMonths));
+  }
+  return null;
 }
 
 // ── Input styles ──────────────────────────────────────────────────────────────
@@ -338,6 +361,8 @@ export default function RequirementsPage() {
 
   // Compliance board
   const [matrix, setMatrix] = useState({});
+  const [ceuSettingsMap, setCeuSettingsMap] = useState({});
+  const [ceuRecordsMap, setCeuRecordsMap] = useState({});
   const [loadingBoard, setLoadingBoard] = useState(false);
   const boardLoadedRef = useRef(false);
   const [markTarget, setMarkTarget] = useState(null);
@@ -366,14 +391,26 @@ export default function RequirementsPage() {
     async function loadBoard() {
       setLoadingBoard(true);
       try {
-        const arrays = await Promise.all(requirements.map((r) => fetchCompletionsForReq(r.id)));
+        const [arrays, ceuResults, ceuRecordResults] = await Promise.all([
+          Promise.all(requirements.map((r) => fetchCompletionsForReq(r.id))),
+          Promise.all(providers.map((p) => fetchCeuSettings(p))),
+          Promise.all(providers.map((p) => fetchPersonnelRecords(p, 'ceus'))),
+        ]);
         if (cancelled) return;
         const m = {};
         requirements.forEach((r, i) => {
           m[r.id] = {};
           arrays[i].forEach((c) => { m[r.id][c.providerName] = c; });
         });
+        const csm = {};
+        const crm = {};
+        providers.forEach((p, i) => {
+          csm[p] = ceuResults[i];
+          crm[p] = ceuRecordResults[i] || [];
+        });
         setMatrix(m);
+        setCeuSettingsMap(csm);
+        setCeuRecordsMap(crm);
         boardLoadedRef.current = true;
       } catch (e) {
         console.error(e);
@@ -383,7 +420,7 @@ export default function RequirementsPage() {
     }
     loadBoard();
     return () => { cancelled = true; };
-  }, [pageTab, requirements]);
+  }, [pageTab, requirements, providers]);
 
   // ── Requirement CRUD ─────────────────────────────────────────────────────
   function openAdd() {
@@ -634,11 +671,14 @@ export default function RequirementsPage() {
                 Click any cell to log or update a completion record.
               </div>
               <div style={{ overflowX: 'auto', borderRadius: 10, border: '1px solid #e5e7eb' }}>
-                <table style={{ borderCollapse: 'collapse', minWidth: '100%', fontSize: 13 }}>
+                <table style={{ borderCollapse: 'collapse', minWidth: requirements.length > 5 ? 150 + 110 + requirements.length * 200 : '100%', fontSize: 13 }}>
                   <thead>
                     <tr>
                       <th style={{ textAlign: 'left', padding: '12px 16px', background: '#f9fafb', borderBottom: '2px solid #e5e7eb', borderRight: '1px solid #e5e7eb', fontWeight: 700, minWidth: 130, position: 'sticky', left: 0, zIndex: 2 }}>
                         Provider
+                      </th>
+                      <th style={{ padding: '10px 12px', background: '#f9fafb', borderBottom: '2px solid #e5e7eb', borderRight: '2px solid #d1d5db', fontWeight: 600, minWidth: 130, textAlign: 'center', lineHeight: 1.3, verticalAlign: 'bottom' }}>
+                        <div style={{ fontSize: 12, color: '#374151' }}>CEU Requirement</div>
                       </th>
                       {requirements.map((req) => (
                         <th key={req.id} style={{ padding: '10px 12px', background: '#f9fafb', borderBottom: '2px solid #e5e7eb', borderRight: '1px solid #e5e7eb', fontWeight: 600, minWidth: 120, maxWidth: 150, textAlign: 'center', lineHeight: 1.3, verticalAlign: 'bottom' }}>
@@ -655,6 +695,49 @@ export default function RequirementsPage() {
                         <tr key={providerName}>
                           <td style={{ padding: '10px 16px', borderBottom: '1px solid #e5e7eb', borderRight: '1px solid #e5e7eb', fontWeight: 600, fontSize: 13, position: 'sticky', left: 0, background: rowBg, zIndex: 1 }}>
                             {providerName}
+                          </td>
+                          <td style={{ padding: '8px 12px', borderBottom: '1px solid #e5e7eb', borderRight: '2px solid #d1d5db', textAlign: 'center', background: rowBg }}>
+                            {(() => {
+                              const cs = ceuSettingsMap[providerName];
+                              if (!cs?.requiredHours) return <span style={{ color: '#d1d5db', fontSize: 13 }}>—</span>;
+                              const required = Number(cs.requiredHours) || 0;
+                              const cycleLabel = cs.cycleMonths == 12 ? 'Annual' : cs.cycleMonths == 24 ? 'Every 2 yrs' : cs.cycleMonths == 36 ? 'Every 3 yrs' : `Every ${cs.cycleMonths} mo`;
+                              const cycle = getCurrentCycle(cs.cycleStartDate, cs.cycleMonths);
+                              // Hours from CEU-type requirements completed within this cycle
+                              const reqHours = requirements
+                                .filter((r) => r.type === 'CEU' && (r.appliesTo === 'all' || (Array.isArray(r.appliesTo) && r.appliesTo.includes(providerName))))
+                                .reduce((sum, r) => {
+                                  const completedDate = matrix[r.id]?.[providerName]?.lastCompletedDate;
+                                  if (!completedDate) return sum;
+                                  if (cycle && (completedDate < cycle.start || completedDate > cycle.end)) return sum;
+                                  return sum + (Number(r.ceuHours) || 0);
+                                }, 0);
+                              // Hours from manually entered CEU records within this cycle
+                              const manualHours = (ceuRecordsMap[providerName] || []).reduce((sum, r) => {
+                                if (!r.completionDate) return sum;
+                                if (cycle && (r.completionDate < cycle.start || r.completionDate > cycle.end)) return sum;
+                                return sum + (parseFloat(r.hours) || 0);
+                              }, 0);
+                              const completedHours = reqHours + manualHours;
+                              const pct = required > 0 ? Math.min(completedHours / required, 1) : 0;
+                              const met = completedHours >= required;
+                              return (
+                                <>
+                                  <div style={{ fontWeight: 700, fontSize: 12, color: met ? '#065f46' : '#6d28d9' }}>
+                                    {completedHours} / {required} hrs
+                                  </div>
+                                  <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 2 }}>{cycleLabel}</div>
+                                  {cycle && (
+                                    <div style={{ fontSize: 10, color: '#6b7280', marginTop: 2 }}>
+                                      Renews {formatDate(cycle.end)}
+                                    </div>
+                                  )}
+                                  <div style={{ height: 4, borderRadius: 2, background: '#e5e7eb', overflow: 'hidden', width: '80%', margin: '5px auto 0' }}>
+                                    <div style={{ width: `${pct * 100}%`, height: '100%', background: met ? '#059669' : '#7c3aed', borderRadius: 2 }} />
+                                  </div>
+                                </>
+                              );
+                            })()}
                           </td>
                           {requirements.map((req) => {
                             const applies = req.appliesTo === 'all' || (Array.isArray(req.appliesTo) && req.appliesTo.includes(providerName));
