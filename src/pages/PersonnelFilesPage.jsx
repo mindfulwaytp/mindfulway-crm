@@ -24,6 +24,7 @@ const TABS = [
   { id: 'compliance', label: 'Compliance' },
   { id: 'credentials', label: 'Credentials' },
   { id: 'trainings', label: 'Trainings' },
+  { id: 'ceu-history', label: 'CEU History' },
   { id: 'contracts', label: 'Contracts' },
 ];
 
@@ -821,6 +822,155 @@ function CeuProgressSection({ providerName, settings, records, reqContributions 
   );
 }
 
+// ── CEU History tab ───────────────────────────────────────────────────────────
+
+function CeuHistoryEntry({ entry }) {
+  return (
+    <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: '10px 14px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 3 }}>
+        <span style={{ fontWeight: 600, fontSize: 13, color: '#111827' }}>{entry.label}</span>
+        {entry.type === 'req' && (
+          <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 20, background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', fontWeight: 600 }}>
+            from requirements
+          </span>
+        )}
+      </div>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        {entry.hours && (
+          <span style={{ fontSize: 12, padding: '1px 7px', borderRadius: 20, background: '#ede9fe', color: '#6d28d9', border: '1px solid #c4b5fd', fontWeight: 600 }}>
+            {entry.hours} hrs
+          </span>
+        )}
+        {entry.category && <span style={{ fontSize: 12, color: '#6b7280' }}>{entry.category}</span>}
+        {entry.date && <span style={{ fontSize: 12, color: '#6b7280' }}>{formatDate(entry.date)}</span>}
+        {entry.organization && <span style={{ fontSize: 12, color: '#6b7280' }}>{entry.organization}</span>}
+        {entry.notes && <span style={{ fontSize: 12, color: '#9ca3af', fontStyle: 'italic' }}>{entry.notes}</span>}
+        {entry.proofUrl && (
+          <a href={entry.proofUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: '#7c3aed', fontWeight: 600 }}>
+            View PDF →
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CeuHistoryTab({ loading, settings, records, reqContributions }) {
+  if (loading) return <div style={{ color: '#9ca3af', fontSize: 13, padding: '24px 0' }}>Loading…</div>;
+
+  const allEntries = [
+    ...records.map((r) => ({
+      key: `m-${r.id}`, type: 'manual', date: r.completionDate || '',
+      label: r.title || 'Untitled', hours: r.hours,
+      category: r.category, organization: r.organization, notes: r.notes, proofUrl: r.proofUrl,
+    })),
+    ...reqContributions.map((c) => ({
+      key: `r-${c.id}`, type: 'req', date: c.completedDate || '',
+      label: c.name, hours: c.hours,
+    })),
+  ];
+
+  if (allEntries.length === 0) {
+    return <div style={{ color: '#9ca3af', fontSize: 13, textAlign: 'center', padding: '48px 0' }}>No CEU records on file yet.</div>;
+  }
+
+  const rawCycle = settings?.cycleStartDate
+    ? getCurrentCycle(settings.cycleStartDate, settings.cycleMonths)
+    : null;
+  // getCurrentCycle returns { start: Date, end: Date } — convert to strings for comparison/display
+  const currentCycle = rawCycle
+    ? { start: toDateStr(rawCycle.start), end: toDateStr(rawCycle.end) }
+    : null;
+
+  if (!currentCycle) {
+    const sorted = [...allEntries].sort((a, b) => b.date.localeCompare(a.date));
+    const totalHours = sorted.reduce((s, e) => s + (parseFloat(e.hours) || 0), 0);
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 4 }}>{totalHours.toFixed(1)} total hours on file</div>
+        {sorted.map((entry) => <CeuHistoryEntry key={entry.key} entry={entry} />)}
+      </div>
+    );
+  }
+
+  function assignCycle(dateStr) {
+    if (!dateStr) return null;
+    const [sy, sm, sd] = settings.cycleStartDate.split('-').map(Number);
+    let start = new Date(sy, sm - 1, sd);
+    if (dateStr < toDateStr(start)) return null;
+    for (let i = 0; i < 200; i++) {
+      const end = new Date(start);
+      end.setMonth(end.getMonth() + Number(settings.cycleMonths));
+      end.setDate(end.getDate() - 1);
+      const s = toDateStr(start); const e = toDateStr(end);
+      if (dateStr <= e) return { start: s, end: e };
+      start = new Date(start);
+      start.setMonth(start.getMonth() + Number(settings.cycleMonths));
+    }
+    return null;
+  }
+
+  const cycleGroups = {};
+  cycleGroups[currentCycle.start] = { ...currentCycle, isCurrent: true, entries: [] };
+  const unassigned = [];
+
+  allEntries.forEach((entry) => {
+    const cycle = assignCycle(entry.date);
+    if (!cycle) { unassigned.push(entry); return; }
+    if (!cycleGroups[cycle.start]) {
+      cycleGroups[cycle.start] = { ...cycle, isCurrent: false, entries: [] };
+    }
+    cycleGroups[cycle.start].entries.push(entry);
+  });
+
+  const sortedGroups = Object.values(cycleGroups).sort((a, b) => b.start.localeCompare(a.start));
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+      {sortedGroups.map((group) => {
+        const groupHours = group.entries.reduce((s, e) => s + (parseFloat(e.hours) || 0), 0);
+        return (
+          <div key={group.start}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12, paddingBottom: 10, borderBottom: '2px solid #e5e7eb' }}>
+              <div style={{ fontWeight: 700, fontSize: 13, color: group.isCurrent ? '#6d28d9' : '#374151' }}>
+                {group.isCurrent ? 'Current Cycle' : 'Past Cycle'}
+              </div>
+              <div style={{ fontSize: 12, color: '#9ca3af' }}>{formatDate(group.start)} — {formatDate(group.end)}</div>
+              <div style={{ marginLeft: 'auto', fontSize: 13, fontWeight: 700, color: group.isCurrent ? '#6d28d9' : '#374151' }}>
+                {groupHours.toFixed(1)} hrs
+                {settings.requiredHours && (
+                  <span style={{ fontWeight: 400, color: '#9ca3af', fontSize: 12 }}> / {settings.requiredHours} required</span>
+                )}
+              </div>
+            </div>
+            {group.entries.length === 0 ? (
+              <div style={{ fontSize: 13, color: '#9ca3af', padding: '8px 0' }}>No records for this cycle.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {[...group.entries].sort((a, b) => b.date.localeCompare(a.date)).map((entry) => (
+                  <CeuHistoryEntry key={entry.key} entry={entry} />
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+      {unassigned.length > 0 && (
+        <div>
+          <div style={{ fontWeight: 700, fontSize: 13, color: '#6b7280', marginBottom: 12, paddingBottom: 10, borderBottom: '2px solid #e5e7eb' }}>
+            Pre-Cycle Records
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {[...unassigned].sort((a, b) => b.date.localeCompare(a.date)).map((entry) => (
+              <CeuHistoryEntry key={entry.key} entry={entry} />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ── Compliance tab helpers ────────────────────────────────────────────────────
 
 const COMP_TYPE_COLORS = {
@@ -1149,7 +1299,7 @@ export default function PersonnelFilesPage({ lockedProvider = null }) {
 
   // ── Load compliance + CEU data when compliance or trainings tab opened ───────
   useEffect(() => {
-    if (!selectedProvider || (activeTab !== 'compliance' && activeTab !== 'trainings')) return;
+    if (!selectedProvider || (activeTab !== 'compliance' && activeTab !== 'trainings' && activeTab !== 'ceu-history')) return;
     if (compFetchedRef.current.has(selectedProvider)) return;
 
     let cancelled = false;
@@ -1371,6 +1521,13 @@ export default function PersonnelFilesPage({ lockedProvider = null }) {
                       ? <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 20, background: '#fef2f2', color: '#dc2626', fontWeight: 700 }}>{issues}</span>
                       : <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 20, background: '#ecfdf5', color: '#065f46', fontWeight: 700 }}>✓</span>;
                   }
+                } else if (tab.id === 'ceu-history') {
+                  const cd = complianceData[selectedProvider];
+                  if (cd) {
+                    const reqCount = (cd.reqs || []).filter((r) => r.type === 'CEU' && cd.completions[r.id]?.lastCompletedDate).length;
+                    const total = (cd.ceuRecords || []).length + reqCount;
+                    if (total > 0) badge = <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 20, background: isActive ? '#ede9fe' : '#f3f4f6', color: isActive ? '#6d28d9' : '#9ca3af', fontWeight: 700 }}>{total}</span>;
+                  }
                 } else {
                   const count = currentRecords[tab.id]?.length ?? null;
                   if (count !== null) {
@@ -1412,6 +1569,19 @@ export default function PersonnelFilesPage({ lockedProvider = null }) {
                 onCeuSettingsSave={handleCeuSettingsSave}
                 onCeuRecordAdd={handleCeuRecordAdd}
                 onCeuRecordDelete={handleCeuRecordDelete}
+              />
+            ) : activeTab === 'ceu-history' ? (
+              <CeuHistoryTab
+                loading={loadingCompliance}
+                settings={complianceData[selectedProvider]?.ceuSettings ?? null}
+                records={complianceData[selectedProvider]?.ceuRecords ?? []}
+                reqContributions={(() => {
+                  const cd = complianceData[selectedProvider];
+                  if (!cd) return [];
+                  return (cd.reqs || [])
+                    .filter((r) => r.type === 'CEU' && cd.completions[r.id]?.lastCompletedDate)
+                    .map((r) => ({ id: r.id, name: r.name, hours: r.ceuHours || 0, completedDate: cd.completions[r.id].lastCompletedDate }));
+                })()}
               />
             ) : activeTab === 'trainings' ? (
               <>
