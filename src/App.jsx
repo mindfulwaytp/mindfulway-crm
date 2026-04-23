@@ -40,6 +40,8 @@ function mergeIntakes(cached, changed) {
   );
 }
 import ProvidersPage from './pages/ProvidersPage';
+import PersonnelFilesPage from './pages/PersonnelFilesPage';
+import RequirementsPage from './pages/RequirementsPage';
 import AvailabilityPage from './pages/AvailabilityPage';
 import MyHoursPage from './pages/MyHoursPage';
 import InternHoursPage from './pages/InternHoursPage';
@@ -1398,6 +1400,8 @@ function AdminApp({ signOut, intakes, setIntakes, providerProfiles, setProviderP
     if (p === '/crm' || p === '/crm/active') return 'active';
     if (p === '/crm/all') return 'all';
     if (p === '/providers') return 'providers';
+    if (p === '/personnel') return 'personnel';
+    if (p === '/requirements') return 'requirements';
     if (p === '/availability') return 'availability';
     if (p === '/hours') return 'intern-hours';
     if (p.startsWith('/intranet')) return 'intranet';
@@ -1792,6 +1796,38 @@ function AdminApp({ signOut, intakes, setIntakes, providerProfiles, setProviderP
           </button>
 
           <button
+            onClick={() => navigate('/personnel')}
+            style={{
+              textAlign: 'left',
+              padding: '12px 14px',
+              borderRadius: 10,
+              border: '1px solid',
+              borderColor: view === 'personnel' ? '#c4b5fd' : '#e5e7eb',
+              background: view === 'personnel' ? '#f5f3ff' : '#fff',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Personnel Files
+          </button>
+
+          <button
+            onClick={() => navigate('/requirements')}
+            style={{
+              textAlign: 'left',
+              padding: '12px 14px',
+              borderRadius: 10,
+              border: '1px solid',
+              borderColor: view === 'requirements' ? '#c4b5fd' : '#e5e7eb',
+              background: view === 'requirements' ? '#f5f3ff' : '#fff',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Requirements
+          </button>
+
+          <button
             onClick={() => navigate('/availability')}
             style={{
               textAlign: 'left',
@@ -1861,6 +1897,10 @@ function AdminApp({ signOut, intakes, setIntakes, providerProfiles, setProviderP
       <div style={{ minWidth: 0 }}>
         {view === 'providers' ? (
           <ProvidersPage />
+        ) : view === 'personnel' ? (
+          <PersonnelFilesPage />
+        ) : view === 'requirements' ? (
+          <RequirementsPage />
         ) : view === 'availability' ? (
           <AvailabilityPage />
         ) : view === 'intern-hours' ? (

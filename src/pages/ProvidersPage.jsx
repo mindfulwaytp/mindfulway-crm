@@ -151,7 +151,7 @@ export default function ProvidersPage() {
     setSaving(true);
     setSaveError(null);
     try {
-      const { name, id, updatedAt, ...dataToSave } = draft;
+      const { name: _name, id: _id, updatedAt: _ua, ...dataToSave } = draft;
       await upsertProviderProfile(editingProvider, dataToSave);
       setProfiles((prev) => ({ ...prev, [editingProvider]: { ...draft, name: editingProvider } }));
       setSuccessMsg(`${editingProvider}'s profile saved.`);

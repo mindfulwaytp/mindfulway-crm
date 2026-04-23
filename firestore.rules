@@ -52,6 +52,25 @@ service cloud.firestore {
       allow write: if isAdmin() || isProviderFor(providerName);
     }
 
+    // ── Personnel sub-collections (credentials, ceus, trainings, contracts) ──
+    // Admin has full access; providers can read their own records
+    match /providers/{providerName}/{subcollection}/{docId} {
+      allow read: if isAdmin() || isProviderFor(providerName);
+      allow write: if isAdmin();
+    }
+
+    // ── Requirements — admin manages templates; all signed-in users can read ──
+    match /requirements/{reqId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // ── Requirement completions — admin write; provider can read own ──────────
+    match /requirements/{reqId}/completions/{providerName} {
+      allow read: if isAdmin() || isProviderFor(providerName);
+      allow write: if isAdmin();
+    }
+
     // ── Intern profiles — admin write; intern or supervisor read ─────────────
     match /internProfiles/{providerName} {
       allow read: if isSignedIn();
