@@ -1378,11 +1378,12 @@ export default function PersonnelFilesPage({ lockedProvider = null }) {
 
   async function handleComplianceSave(reqId, data) {
     await setCompletionApi(reqId, selectedProvider, data);
+    const updated = await fetchCompletionForProvider(reqId, selectedProvider);
     setComplianceData((prev) => ({
       ...prev,
       [selectedProvider]: {
         ...prev[selectedProvider],
-        completions: { ...prev[selectedProvider].completions, [reqId]: { providerName: selectedProvider, ...data } },
+        completions: { ...prev[selectedProvider].completions, [reqId]: updated },
       },
     }));
   }
@@ -1524,7 +1525,13 @@ export default function PersonnelFilesPage({ lockedProvider = null }) {
                 } else if (tab.id === 'ceu-history') {
                   const cd = complianceData[selectedProvider];
                   if (cd) {
-                    const reqCount = (cd.reqs || []).filter((r) => r.type === 'CEU' && cd.completions[r.id]?.lastCompletedDate).length;
+                    const reqCount = (cd.reqs || [])
+                      .filter((r) => r.type === 'CEU')
+                      .reduce((sum, r) => {
+                        const comp = cd.completions[r.id];
+                        if (!comp) return sum;
+                        return sum + (comp.lastCompletedDate ? 1 : 0) + (comp.completionHistory?.length || 0);
+                      }, 0);
                     const total = (cd.ceuRecords || []).length + reqCount;
                     if (total > 0) badge = <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 20, background: isActive ? '#ede9fe' : '#f3f4f6', color: isActive ? '#6d28d9' : '#9ca3af', fontWeight: 700 }}>{total}</span>;
                   }
@@ -1579,8 +1586,19 @@ export default function PersonnelFilesPage({ lockedProvider = null }) {
                   const cd = complianceData[selectedProvider];
                   if (!cd) return [];
                   return (cd.reqs || [])
-                    .filter((r) => r.type === 'CEU' && cd.completions[r.id]?.lastCompletedDate)
-                    .map((r) => ({ id: r.id, name: r.name, hours: r.ceuHours || 0, completedDate: cd.completions[r.id].lastCompletedDate }));
+                    .filter((r) => r.type === 'CEU')
+                    .flatMap((r) => {
+                      const comp = cd.completions[r.id];
+                      if (!comp) return [];
+                      const entries = [];
+                      if (comp.lastCompletedDate) {
+                        entries.push({ id: r.id, name: r.name, hours: r.ceuHours || 0, completedDate: comp.lastCompletedDate });
+                      }
+                      (comp.completionHistory || []).forEach((date, i) => {
+                        entries.push({ id: `${r.id}-h${i}`, name: r.name, hours: r.ceuHours || 0, completedDate: date });
+                      });
+                      return entries;
+                    });
                 })()}
               />
             ) : activeTab === 'trainings' ? (

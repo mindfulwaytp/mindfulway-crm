@@ -8,6 +8,7 @@ import {
   getDoc,
   setDoc,
   serverTimestamp,
+  arrayUnion,
 } from 'firebase/firestore';
 import { db } from './firebase';
 
@@ -53,11 +54,16 @@ export async function fetchCompletionForProvider(reqId, providerName) {
 }
 
 export async function setCompletion(reqId, providerName, data) {
-  await setDoc(
-    doc(db, 'requirements', reqId, 'completions', providerName),
-    { ...data, updatedAt: serverTimestamp() },
-    { merge: true },
-  );
+  const ref = doc(db, 'requirements', reqId, 'completions', providerName);
+  const existing = await getDoc(ref);
+  const existingDate = existing.exists() ? existing.data().lastCompletedDate : null;
+
+  const updateData = { ...data, updatedAt: serverTimestamp() };
+  if (existingDate && existingDate !== data.lastCompletedDate) {
+    updateData.completionHistory = arrayUnion(existingDate);
+  }
+
+  await setDoc(ref, updateData, { merge: true });
 }
 
 export async function deleteCompletion(reqId, providerName) {
