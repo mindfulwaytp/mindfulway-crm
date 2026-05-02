@@ -7,6 +7,7 @@ import {
 } from '../lib/hourEntriesApi';
 import HourEntryModal from '../components/HourEntryModal';
 import NotificationBell from '../components/NotificationBell';
+import HoursOverview from '../components/HoursOverview';
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -97,6 +98,9 @@ export default function MyHoursPage({ onNav }) {
   const [showAddModal, setShowAddModal] = useState(false);
   const [changeEntry, setChangeEntry] = useState(null); // entry to request change on
   const [pendingCRs, setPendingCRs] = useState(new Set()); // entry IDs with pending CRs
+  const [hoursTab, setHoursTab] = useState('week'); // 'week' | 'overview'
+  const [overviewSort, setOverviewSort] = useState({ key: 'date', dir: 'desc' });
+  const [overviewTypeFilter, setOverviewTypeFilter] = useState('all');
 
   const load = useCallback(async () => {
     if (!providerName) return;
@@ -200,62 +204,82 @@ export default function MyHoursPage({ onNav }) {
               </div>
             )}
 
-            {/* Week nav + entries */}
-            <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 24 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <button onClick={() => setMonday((m) => { const d = new Date(m); d.setDate(d.getDate() - 7); return d; })} style={navBtnStyle}>←</button>
-                  <span style={{ fontWeight: 600, fontSize: 14 }}>Week of {formatWeekLabel(monday)}</span>
-                  <button onClick={() => setMonday((m) => { const d = new Date(m); d.setDate(d.getDate() + 7); return d; })} style={navBtnStyle}>→</button>
-                </div>
-                <button onClick={() => setShowAddModal(true)} style={primaryBtnStyle}>+ Add Entry</button>
-              </div>
-
-              {weekEntries.length === 0 ? (
-                <div style={{ color: '#9ca3af', fontSize: 13, padding: '16px 0' }}>No entries for this week.</div>
-              ) : (
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-                  <thead>
-                    <tr style={{ borderBottom: '2px solid #e5e7eb' }}>
-                      {['Date', 'Type', 'Hours', 'Notes', ''].map((h) => (
-                        <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, fontSize: 11, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {weekEntries.map((e) => {
-                      const ht = HOUR_TYPES.find((t) => t.key === e.type);
-                      const hasPendingCR = pendingCRs.has(e.id);
-                      const dateStr = new Date(e.date.seconds * 1000).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-                      return (
-                        <tr key={e.id} style={{ borderBottom: '1px solid #f1f5f9', background: hasPendingCR ? '#fffbeb' : '#fff' }}>
-                          <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>{dateStr}</td>
-                          <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
-                            <span style={{ padding: '2px 10px', borderRadius: 20, background: ht?.bg || '#f9fafb', color: ht?.color || '#374151', fontWeight: 600, fontSize: 12 }}>
-                              {ht?.label || e.type}
-                            </span>
-                          </td>
-                          <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>{e.hours} hrs</td>
-                          <td style={{ padding: '10px 12px', verticalAlign: 'middle', color: '#6b7280' }}>{e.notes || '—'}</td>
-                          <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
-                            {hasPendingCR ? (
-                              <span style={{ fontSize: 11, color: '#d97706', fontWeight: 600 }}>Change requested</span>
-                            ) : (
-                              <button
-                                onClick={() => setChangeEntry(e)}
-                                style={{ fontSize: 12, padding: '3px 10px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', color: '#6b7280' }}
-                              >
-                                Request change
-                              </button>
-                            )}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              )}
+            {/* View tabs */}
+            <div style={{ display: 'flex', gap: 4, background: '#f3f4f6', borderRadius: 10, padding: 4, marginBottom: 16, width: 'fit-content' }}>
+              <button onClick={() => setHoursTab('week')} style={detailTabStyle(hoursTab === 'week')}>Week Log</button>
+              <button onClick={() => setHoursTab('overview')} style={detailTabStyle(hoursTab === 'overview')}>Hours Overview</button>
             </div>
+
+            {hoursTab === 'week' && (
+              <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 24 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <button onClick={() => setMonday((m) => { const d = new Date(m); d.setDate(d.getDate() - 7); return d; })} style={navBtnStyle}>←</button>
+                    <span style={{ fontWeight: 600, fontSize: 14 }}>Week of {formatWeekLabel(monday)}</span>
+                    <button onClick={() => setMonday((m) => { const d = new Date(m); d.setDate(d.getDate() + 7); return d; })} style={navBtnStyle}>→</button>
+                  </div>
+                  <button onClick={() => setShowAddModal(true)} style={primaryBtnStyle}>+ Add Entry</button>
+                </div>
+
+                {weekEntries.length === 0 ? (
+                  <div style={{ color: '#9ca3af', fontSize: 13, padding: '16px 0' }}>No entries for this week.</div>
+                ) : (
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                    <thead>
+                      <tr style={{ borderBottom: '2px solid #e5e7eb' }}>
+                        {['Date', 'Type', 'Hours', 'Notes', ''].map((h) => (
+                          <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, fontSize: 11, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {weekEntries.map((e) => {
+                        const ht = HOUR_TYPES.find((t) => t.key === e.type);
+                        const hasPendingCR = pendingCRs.has(e.id);
+                        const dateStr = new Date(e.date.seconds * 1000).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                        return (
+                          <tr key={e.id} style={{ borderBottom: '1px solid #f1f5f9', background: hasPendingCR ? '#fffbeb' : '#fff' }}>
+                            <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>{dateStr}</td>
+                            <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
+                              <span style={{ padding: '2px 10px', borderRadius: 20, background: ht?.bg || '#f9fafb', color: ht?.color || '#374151', fontWeight: 600, fontSize: 12 }}>
+                                {ht?.label || e.type}
+                              </span>
+                            </td>
+                            <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>{e.hours} hrs</td>
+                            <td style={{ padding: '10px 12px', verticalAlign: 'middle', color: '#6b7280' }}>{e.notes || '—'}</td>
+                            <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
+                              {hasPendingCR ? (
+                                <span style={{ fontSize: 11, color: '#d97706', fontWeight: 600 }}>Change requested</span>
+                              ) : (
+                                <button
+                                  onClick={() => setChangeEntry(e)}
+                                  style={{ fontSize: 12, padding: '3px 10px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', color: '#6b7280' }}
+                                >
+                                  Request change
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            )}
+
+            {hoursTab === 'overview' && (
+              <HoursOverview
+                entries={entries}
+                onAddEntry={() => setShowAddModal(true)}
+                sort={overviewSort}
+                onSortChange={setOverviewSort}
+                typeFilter={overviewTypeFilter}
+                onTypeFilterChange={setOverviewTypeFilter}
+                pendingCRIds={pendingCRs}
+                onRequestChange={(e) => setChangeEntry(e)}
+              />
+            )}
           </>
         )}
       </div>
@@ -295,6 +319,15 @@ const navBtnStyle = {
 function tabStyle(active) {
   return {
     padding: '5px 14px', borderRadius: 6, border: 'none', fontSize: 13, fontWeight: 600,
+    cursor: 'pointer', background: active ? '#fff' : 'transparent',
+    color: active ? '#111827' : '#6b7280',
+    boxShadow: active ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+  };
+}
+
+function detailTabStyle(active) {
+  return {
+    padding: '7px 18px', borderRadius: 7, border: 'none', fontSize: 13, fontWeight: 600,
     cursor: 'pointer', background: active ? '#fff' : 'transparent',
     color: active ? '#111827' : '#6b7280',
     boxShadow: active ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
