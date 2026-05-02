@@ -37,8 +37,8 @@ const PERSONNEL_ITEMS = [
   },
   {
     id: 'hours',
-    label: 'Intern Hours',
-    description: 'Track supervised hours and progress toward licensure',
+    label: 'Hours Log',
+    description: 'Track supervised hours and progress toward licensure for interns and associates',
     path: '/personnel/hours',
     color: '#d97706',
     bg: '#fffbeb',

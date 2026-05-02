@@ -191,9 +191,19 @@ function ProviderSelect({ value, onChange, inputStyle, providers = [] }) {
   );
 }
 
+function todayYmd() {
+  const d = new Date();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${m}-${day}`;
+}
+
 const blankDraft = {
   source: 'manual',
+  inquiryDate: '', // YYYY-MM-DD (drives createdAt)
   intake: {
+    firstName: '',
+    lastName: '',
     clientName: '',
     preferredName: '',
     phone: '',
@@ -229,7 +239,10 @@ const blankDraft = {
 };
 
 function NewEntryModal({ onClose, onCreated, providers = [] }) {
-  const [draft, setDraft] = useState(() => JSON.parse(JSON.stringify(blankDraft)));
+  const [draft, setDraft] = useState(() => ({
+    ...JSON.parse(JSON.stringify(blankDraft)),
+    inquiryDate: todayYmd(),
+  }));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -243,28 +256,36 @@ function NewEntryModal({ onClose, onCreated, providers = [] }) {
         cur = cur[keys[i]];
       }
       cur[keys[keys.length - 1]] = value;
-      // Keep clientName in sync with first/last if set directly
-      if (path === 'intake.clientName') {
-        const parts = value.trim().split(' ');
-        next.intake.firstName = parts[0] || '';
-        next.intake.lastName = parts.slice(1).join(' ') || '';
+      // Keep clientName in sync with first/last
+      if (path === 'intake.firstName' || path === 'intake.lastName') {
+        next.intake.clientName = `${next.intake.firstName || ''} ${next.intake.lastName || ''}`.trim();
       }
       return next;
     });
   }
 
   async function handleSubmit() {
-    if (!draft.intake.clientName.trim()) {
-      setError('Client name is required.');
+    const firstName = (draft.intake.firstName || '').trim();
+    const lastName = (draft.intake.lastName || '').trim();
+    if (!firstName && !lastName) {
+      setError('First or last name is required.');
       return;
     }
     setSaving(true);
     setError('');
     try {
+      // Derive clientName from first + last and parse inquiryDate -> createdAt
+      const clientName = `${firstName} ${lastName}`.trim();
+      let createdAtDate = null;
+      if (draft.inquiryDate && /^\d{4}-\d{2}-\d{2}$/.test(draft.inquiryDate)) {
+        const [y, m, d] = draft.inquiryDate.split('-').map(Number);
+        createdAtDate = new Date(y, m - 1, d);
+      }
+      const { inquiryDate: _ignored, ...rest } = draft;
       const id = await createInquiry({
-        ...draft,
-        createdAt: new Date(),
-        updatedAt: new Date(),
+        ...rest,
+        intake: { ...rest.intake, firstName, lastName, clientName },
+        ...(createdAtDate ? { createdAt: createdAtDate } : {}),
       });
       onCreated(id);
     } catch (err) {
@@ -315,6 +336,15 @@ function NewEntryModal({ onClose, onCreated, providers = [] }) {
             <h3 style={{ marginTop: 0, marginBottom: 14, fontSize: 17, fontWeight: 700 }}>Pipeline</h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 14, fontSize: 14 }}>
               <div style={{ gridColumn: '1 / -1' }}>
+                <label style={labelStyle}>Inquiry Date</label>
+                <input
+                  type="date"
+                  value={draft.inquiryDate}
+                  onChange={(e) => update('inquiryDate', e.target.value)}
+                  style={inputStyle}
+                />
+              </div>
+              <div style={{ gridColumn: '1 / -1' }}>
                 <label style={labelStyle}>Status</label>
                 <select value={draft.pipeline.status} onChange={(e) => update('pipeline.status', e.target.value)} style={inputStyle}>
                   <option value="new">New</option>
@@ -348,8 +378,12 @@ function NewEntryModal({ onClose, onCreated, providers = [] }) {
             <h3 style={{ marginTop: 0, marginBottom: 14, fontSize: 17, fontWeight: 700 }}>Intake Details</h3>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, minmax(0, 1fr))', gap: 14, fontSize: 14 }}>
               <div style={{ gridColumn: 'span 2' }}>
-                <label style={labelStyle}>Client Name *</label>
-                <input type="text" value={draft.intake.clientName} onChange={(e) => update('intake.clientName', e.target.value)} placeholder="First Last" style={inputStyle} />
+                <label style={labelStyle}>First Name *</label>
+                <input type="text" value={draft.intake.firstName} onChange={(e) => update('intake.firstName', e.target.value)} style={inputStyle} />
+              </div>
+              <div style={{ gridColumn: 'span 2' }}>
+                <label style={labelStyle}>Last Name *</label>
+                <input type="text" value={draft.intake.lastName} onChange={(e) => update('intake.lastName', e.target.value)} style={inputStyle} />
               </div>
               <div style={{ gridColumn: 'span 2' }}>
                 <label style={labelStyle}>Preferred Name</label>
@@ -357,7 +391,7 @@ function NewEntryModal({ onClose, onCreated, providers = [] }) {
               </div>
               <div style={{ gridColumn: 'span 2' }}>
                 <label style={labelStyle}>DOB</label>
-                <input type="text" value={draft.intake.dob} onChange={(e) => update('intake.dob', e.target.value)} placeholder="YYYY-MM-DD" style={inputStyle} />
+                <input type="date" value={draft.intake.dob} onChange={(e) => update('intake.dob', e.target.value)} style={inputStyle} />
               </div>
 
               <div style={{ gridColumn: '1 / -1' }}>
@@ -1185,7 +1219,7 @@ function DetailPanel({
 }
 
 export default function App() {
-  const { user, isAdmin, isSupervisor, isIntern, isProvider, accessDenied, loading: authLoading, signOut } = useAuth();
+  const { user, isAdmin, isSupervisor, isIntern, isAssociate, isProvider, accessDenied, loading: authLoading, signOut } = useAuth();
 
   // Lifted here so data survives Hub navigation (AdminApp remounts on route changes)
   const [intakes, setIntakes] = useState([]);
@@ -1297,7 +1331,7 @@ export default function App() {
     );
   }
 
-  if (isIntern || isSupervisor) {
+  if (isIntern || isAssociate || isSupervisor) {
     return (
       <Routes>
         <Route path="/" element={<HubPage />} />
@@ -1306,7 +1340,7 @@ export default function App() {
         <Route path="/intranet/resources" element={<IntranetResourcesPage />} />
         <Route path="/intranet/policies" element={<IntranetPoliciesPage />} />
         <Route path="/availability" element={<AvailabilityWithNav />} />
-        <Route path="/hours" element={isIntern ? <MyHoursPage /> : <InternHoursPage />} />
+        <Route path="/hours" element={(isIntern || isAssociate) ? <MyHoursPage /> : <InternHoursPage />} />
         {isSupervisor && (
           <>
             <Route path="/personnel" element={<PersonnelHubPage />} />
@@ -1420,13 +1454,13 @@ function AdminApp({ signOut, intakes, setIntakes, providerProfiles, setProviderP
     if (p === '/personnel') return 'personnel-hub';
     if (p === '/personnel/files') return 'personnel';
     if (p === '/personnel/compliance') return 'requirements';
-    if (p === '/personnel/hours') return 'intern-hours';
+    if (p === '/personnel/hours') return 'hours-log';
     if (p === '/availability') return 'availability';
     if (p.startsWith('/intranet')) return 'intranet';
     return 'active';
   }, [location.pathname]);
 
-  const personnelOpen = ['personnel-hub', 'personnel', 'requirements', 'intern-hours'].includes(view);
+  const personnelOpen = ['personnel-hub', 'personnel', 'requirements', 'hours-log'].includes(view);
 
   const crmOpen = view === 'active' || view === 'all';
   const [selectedInquiry, setSelectedInquiry] = useState(null);
@@ -1862,12 +1896,12 @@ function AdminApp({ signOut, intakes, setIntakes, providerProfiles, setProviderP
                   onClick={() => navigate('/personnel/hours')}
                   style={{
                     textAlign: 'left', padding: '9px 14px', borderRadius: 8, border: '1px solid',
-                    borderColor: view === 'intern-hours' ? '#c4b5fd' : '#e5e7eb',
-                    background: view === 'intern-hours' ? '#ede9fe' : '#fafafa',
+                    borderColor: view === 'hours-log' ? '#c4b5fd' : '#e5e7eb',
+                    background: view === 'hours-log' ? '#ede9fe' : '#fafafa',
                     fontWeight: 600, cursor: 'pointer', fontSize: 13,
                   }}
                 >
-                  Intern Hours
+                  Hours Log
                 </button>
               </div>
             )}
@@ -1935,7 +1969,7 @@ function AdminApp({ signOut, intakes, setIntakes, providerProfiles, setProviderP
           <RequirementsPage />
         ) : view === 'availability' ? (
           <AvailabilityPage />
-        ) : view === 'intern-hours' ? (
+        ) : view === 'hours-log' ? (
           <InternHoursPage />
         ) : view === 'intranet' ? (
           location.pathname === '/intranet/news' ? <IntranetNewsPage embedded /> :
@@ -2576,8 +2610,9 @@ function AdminApp({ signOut, intakes, setIntakes, providerProfiles, setProviderP
         {showNewEntry ? (
           <NewEntryModal
             onClose={() => setShowNewEntry(false)}
-            onCreated={() => {
+            onCreated={async () => {
               setShowNewEntry(false);
+              await onRefresh();
             }}
             providers={providerProfiles.map((p) => p.name).sort()}
           />

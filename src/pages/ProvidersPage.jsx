@@ -18,10 +18,11 @@ const LICENSURE_OPTIONS = [
 ];
 const GENDER_OPTIONS = ['Female', 'Male', 'Non-binary', 'Prefer not to say'];
 
-const ROLE_OPTIONS = ['provider', 'intern', 'supervisor', 'admin'];
-const ROLE_LABELS = { provider: 'Provider', intern: 'Intern', supervisor: 'Supervisor', admin: 'Admin' };
+const ROLE_OPTIONS = ['provider', 'associate', 'intern', 'supervisor', 'admin'];
+const ROLE_LABELS = { provider: 'Provider', associate: 'Associate', intern: 'Intern', supervisor: 'Supervisor', admin: 'Admin' };
 const ROLE_COLORS = {
   provider: { bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' },
+  associate: { bg: '#fff7ed', color: '#9a3412', border: '#fed7aa' },
   intern:   { bg: '#fef3c7', color: '#92400e', border: '#fde68a' },
   supervisor: { bg: '#f0fdf4', color: '#166534', border: '#bbf7d0' },
   admin:    { bg: '#fdf4ff', color: '#7e22ce', border: '#e9d5ff' },

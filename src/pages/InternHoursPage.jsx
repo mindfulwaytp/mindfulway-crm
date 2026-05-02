@@ -25,7 +25,7 @@ function ProgressBar({ logged, required, color }) {
   );
 }
 
-function RequirementsForm({ draft, onChange, onSave, saving, supervisorOptions, canEdit }) {
+function RequirementsForm({ draft, onChange, onSave, saving, supervisorOptions, canEdit, showEndDate }) {
   const fields = [
     { key: 'totalHoursRequired', label: 'Total Hours' },
     { key: 'directContactHoursRequired', label: 'Direct Contact' },
@@ -34,6 +34,8 @@ function RequirementsForm({ draft, onChange, onSave, saving, supervisorOptions, 
     { key: 'relationalTherapyHoursRequired', label: 'Relational Therapy (0 = N/A)' },
     { key: 'adminHoursRequired', label: 'Administrative' },
   ];
+  const dateFieldStyle = { display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: '#6b7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' };
+  const dateInputStyle = { padding: '6px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, color: '#111827', background: canEdit ? '#fff' : '#f9fafb' };
   return (
     <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 20, marginBottom: 24 }}>
       <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 16 }}>Requirements</div>
@@ -53,14 +55,14 @@ function RequirementsForm({ draft, onChange, onSave, saving, supervisorOptions, 
           </label>
         ))}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: '#6b7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: showEndDate ? '1fr 1fr 1fr' : '1fr 1fr', gap: 12, marginBottom: 16 }}>
+        <label style={dateFieldStyle}>
           Supervisor
           <select
             value={draft.supervisorName || ''}
             onChange={(e) => onChange('supervisorName', e.target.value)}
             disabled={!canEdit}
-            style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, color: '#111827', background: canEdit ? '#fff' : '#f9fafb' }}
+            style={dateInputStyle}
           >
             <option value="">— Unassigned —</option>
             {supervisorOptions.map((s) => (
@@ -71,16 +73,28 @@ function RequirementsForm({ draft, onChange, onSave, saving, supervisorOptions, 
             )}
           </select>
         </label>
-        <label style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12, color: '#6b7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+        <label style={dateFieldStyle}>
           Start Date
           <input
             type="date"
             value={draft.startDate || ''}
             onChange={(e) => onChange('startDate', e.target.value)}
             disabled={!canEdit}
-            style={{ padding: '6px 10px', borderRadius: 8, border: '1px solid #d1d5db', fontSize: 14, color: '#111827', background: canEdit ? '#fff' : '#f9fafb' }}
+            style={dateInputStyle}
           />
         </label>
+        {showEndDate && (
+          <label style={dateFieldStyle}>
+            End Date
+            <input
+              type="date"
+              value={draft.endDate || ''}
+              onChange={(e) => onChange('endDate', e.target.value)}
+              disabled={!canEdit}
+              style={dateInputStyle}
+            />
+          </label>
+        )}
       </div>
       {canEdit && (
         <button
@@ -168,10 +182,13 @@ export default function InternHoursPage({ onNav }) {
   const [changeRequests, setChangeRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState(null);
+  const [detailTab, setDetailTab] = useState('settings'); // 'settings' | 'week' | 'overview'
   const [monday, setMonday] = useState(() => getMondayOf(new Date()));
   const [reqDraft, setReqDraft] = useState({});
   const [savingReq, setSavingReq] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [overviewSort, setOverviewSort] = useState({ key: 'date', dir: 'desc' });
+  const [overviewTypeFilter, setOverviewTypeFilter] = useState('all');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -183,7 +200,12 @@ export default function InternHoursPage({ onNav }) {
         fetchAllChangeRequests(),
       ]);
       const internList = providers
-        .filter((p) => Array.isArray(p.roles) ? p.roles.includes('intern') : p.isIntern)
+        .filter((p) => {
+          if (Array.isArray(p.roles)) {
+            return p.roles.includes('intern') || p.roles.includes('associate');
+          }
+          return p.isIntern;
+        })
         .sort((a, b) => a.name.localeCompare(b.name));
       const supervisorList = providers
         .filter((p) => Array.isArray(p.roles) && p.roles.includes('supervisor'))
@@ -212,6 +234,7 @@ export default function InternHoursPage({ onNav }) {
 
   function selectIntern(name) {
     setSelected(name);
+    setDetailTab('settings');
     setReqDraft({ ...EMPTY_INTERN_REQUIREMENTS, ...(internProfiles[name] || {}) });
     setMonday(getMondayOf(new Date()));
   }
@@ -265,7 +288,7 @@ export default function InternHoursPage({ onNav }) {
         <span style={{ fontWeight: 700, fontSize: 17 }}>Mindful Way</span>
         <div style={{ display: 'flex', gap: 4, background: '#f3f4f6', borderRadius: 8, padding: 3 }}>
           <button onClick={() => onNav('availability')} style={tabStyle(false)}>My Availability</button>
-          <button style={tabStyle(true)}>Intern Hours</button>
+          <button style={tabStyle(true)}>Hours Log</button>
         </div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -290,6 +313,11 @@ export default function InternHoursPage({ onNav }) {
   // ── Detail view ─────────────────────────────────────────────────────────────
   if (selected) {
     const req = internProfiles[selected] || {};
+    const selectedIntern = interns.find((i) => i.name === selected);
+    const selectedRoles = Array.isArray(selectedIntern?.roles)
+      ? selectedIntern.roles
+      : (selectedIntern?.isIntern ? ['intern'] : []);
+    const isInternRole = selectedRoles.includes('intern');
     const internEntries = allEntries.filter((e) => e.internName === selected);
     const weekEntries = entriesInWeek(internEntries, monday);
     const totals = sumByType(internEntries);
@@ -304,13 +332,16 @@ export default function InternHoursPage({ onNav }) {
             ← All Interns
           </button>
 
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 16, marginBottom: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 16, marginBottom: 24, flexWrap: 'wrap' }}>
             <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700 }}>{selected}</h1>
             {req.supervisorName && (
               <span style={{ fontSize: 14, color: '#6b7280' }}>Supervisor: {req.supervisorName}</span>
             )}
             {req.startDate && (
               <span style={{ fontSize: 13, color: '#9ca3af' }}>Started {req.startDate}</span>
+            )}
+            {isInternRole && req.endDate && (
+              <span style={{ fontSize: 13, color: '#9ca3af' }}>Ends {req.endDate}</span>
             )}
           </div>
 
@@ -335,27 +366,51 @@ export default function InternHoursPage({ onNav }) {
             })}
           </div>
 
-          <RequirementsForm
-            draft={reqDraft}
-            onChange={(k, v) => setReqDraft((d) => ({ ...d, [k]: v }))}
-            onSave={saveRequirements}
-            saving={savingReq}
-            supervisorOptions={supervisors}
-            canEdit={isAdmin}
-          />
-
-          {/* Week log */}
-          <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 20, marginBottom: 24 }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-              <WeekNav
-                monday={monday}
-                onPrev={() => setMonday((m) => { const d = new Date(m); d.setDate(d.getDate() - 7); return d; })}
-                onNext={() => setMonday((m) => { const d = new Date(m); d.setDate(d.getDate() + 7); return d; })}
-              />
-              <button onClick={() => setShowAddModal(true)} style={primaryBtnStyle}>+ Add Entry</button>
-            </div>
-            <EntriesTable entries={weekEntries} changeRequests={changeRequests} onResolve={handleResolve} />
+          {/* Detail tabs */}
+          <div style={{ display: 'flex', gap: 4, background: '#f3f4f6', borderRadius: 10, padding: 4, marginBottom: 16, width: 'fit-content' }}>
+            <button onClick={() => setDetailTab('settings')} style={detailTabStyle(detailTab === 'settings')}>Settings</button>
+            <button onClick={() => setDetailTab('week')} style={detailTabStyle(detailTab === 'week')}>Week Log</button>
+            <button onClick={() => setDetailTab('overview')} style={detailTabStyle(detailTab === 'overview')}>Hours Overview</button>
           </div>
+
+          {detailTab === 'settings' && (
+            <RequirementsForm
+              draft={reqDraft}
+              onChange={(k, v) => setReqDraft((d) => ({ ...d, [k]: v }))}
+              onSave={saveRequirements}
+              saving={savingReq}
+              supervisorOptions={supervisors}
+              canEdit={isAdmin}
+              showEndDate={isInternRole}
+            />
+          )}
+
+          {detailTab === 'week' && (
+            <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 20, marginBottom: 24 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+                <WeekNav
+                  monday={monday}
+                  onPrev={() => setMonday((m) => { const d = new Date(m); d.setDate(d.getDate() - 7); return d; })}
+                  onNext={() => setMonday((m) => { const d = new Date(m); d.setDate(d.getDate() + 7); return d; })}
+                />
+                <button onClick={() => setShowAddModal(true)} style={primaryBtnStyle}>+ Add Entry</button>
+              </div>
+              <EntriesTable entries={weekEntries} changeRequests={changeRequests} onResolve={handleResolve} />
+            </div>
+          )}
+
+          {detailTab === 'overview' && (
+            <HoursOverview
+              entries={internEntries}
+              changeRequests={changeRequests}
+              onResolve={handleResolve}
+              onAddEntry={() => setShowAddModal(true)}
+              sort={overviewSort}
+              onSortChange={setOverviewSort}
+              typeFilter={overviewTypeFilter}
+              onTypeFilterChange={setOverviewTypeFilter}
+            />
+          )}
 
           {/* Pending change requests */}
           {pendingCRs.length > 0 && (
@@ -400,18 +455,18 @@ export default function InternHoursPage({ onNav }) {
     <div style={{ minHeight: onNav ? '100vh' : 'auto', background: '#f9fafb' }}>
       {standaloneHeader}
       <div style={{ padding: '32px 40px' }}>
-        <h1 style={{ margin: '0 0 8px', fontSize: 22, fontWeight: 700 }}>Intern Hours</h1>
+        <h1 style={{ margin: '0 0 8px', fontSize: 22, fontWeight: 700 }}>Hours Log</h1>
         <p style={{ margin: '0 0 28px', fontSize: 14, color: '#6b7280' }}>
           {isAdmin
-            ? 'Track progress for all interns against their hour requirements.'
-            : 'Track progress for the interns you supervise.'}
+            ? 'Track progress for all interns and associates against their hour requirements.'
+            : 'Track progress for the interns and associates you supervise.'}
         </p>
 
         {visibleInterns.length === 0 ? (
           <div style={{ color: '#9ca3af', fontSize: 14 }}>
             {isAdmin
-              ? <>No interns found. Add the <strong>Intern</strong> role to a provider profile to get started.</>
-              : <>No interns are currently assigned to you. Ask an administrator to assign interns to your supervision.</>}
+              ? <>No interns or associates found. Add the <strong>Intern</strong> or <strong>Associate</strong> role to a provider profile to get started.</>
+              : <>No interns or associates are currently assigned to you. Ask an administrator to assign them to your supervision.</>}
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: 16 }}>
@@ -424,10 +479,22 @@ export default function InternHoursPage({ onNav }) {
               const pct = total > 0 ? Math.min(100, Math.round((totalLogged / total) * 100)) : 0;
               const pendingCount = changeRequests.filter((r) => r.internName === intern.name && r.status === 'pending').length;
 
+              const roles = Array.isArray(intern.roles) ? intern.roles : (intern.isIntern ? ['intern'] : []);
+              const isAssoc = roles.includes('associate');
+              const roleLabel = isAssoc && !roles.includes('intern') ? 'Associate' : 'Intern';
+              const rolePillColors = isAssoc && !roles.includes('intern')
+                ? { bg: '#fff7ed', color: '#9a3412', border: '#fed7aa' }
+                : { bg: '#fef3c7', color: '#92400e', border: '#fde68a' };
+
               return (
                 <div key={intern.name} style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 20 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
-                    <div style={{ fontWeight: 700, fontSize: 16 }}>{intern.name}</div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4, gap: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: 16 }}>{intern.name}</div>
+                      <span style={{ fontSize: 10, padding: '2px 7px', borderRadius: 20, background: rolePillColors.bg, color: rolePillColors.color, fontWeight: 700, border: `1px solid ${rolePillColors.border}`, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                        {roleLabel}
+                      </span>
+                    </div>
                     {pendingCount > 0 && (
                       <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#fef3c7', color: '#92400e', fontWeight: 600, border: '1px solid #fde68a' }}>
                         {pendingCount} change request{pendingCount > 1 ? 's' : ''}
@@ -500,4 +567,180 @@ function tabStyle(active) {
     color: active ? '#111827' : '#6b7280',
     boxShadow: active ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
   };
+}
+
+function detailTabStyle(active) {
+  return {
+    padding: '7px 18px', borderRadius: 7, border: 'none', fontSize: 13, fontWeight: 600,
+    cursor: 'pointer', background: active ? '#fff' : 'transparent',
+    color: active ? '#111827' : '#6b7280',
+    boxShadow: active ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+  };
+}
+
+// ── Hours Overview (flat sortable spreadsheet) ────────────────────────────────
+
+function HoursOverview({ entries, changeRequests, onResolve, onAddEntry, sort, onSortChange, typeFilter, onTypeFilterChange }) {
+  const filtered = typeFilter === 'all'
+    ? entries
+    : entries.filter((e) => e.type === typeFilter);
+
+  const sorted = [...filtered].sort((a, b) => {
+    let av, bv;
+    if (sort.key === 'date') { av = a.date.seconds; bv = b.date.seconds; }
+    else if (sort.key === 'type') { av = a.type; bv = b.type; }
+    else if (sort.key === 'hours') { av = a.hours; bv = b.hours; }
+    else if (sort.key === 'loggedBy') {
+      av = a.createdBy?.name || (a.createdBy?.role && a.createdBy.role !== 'intern' ? a.createdBy.role : 'Intern');
+      bv = b.createdBy?.name || (b.createdBy?.role && b.createdBy.role !== 'intern' ? b.createdBy.role : 'Intern');
+    }
+    if (av < bv) return sort.dir === 'asc' ? -1 : 1;
+    if (av > bv) return sort.dir === 'asc' ? 1 : -1;
+    return 0;
+  });
+
+  function toggleSort(key) {
+    if (sort.key === key) {
+      onSortChange({ key, dir: sort.dir === 'asc' ? 'desc' : 'asc' });
+    } else {
+      onSortChange({ key, dir: key === 'date' ? 'desc' : 'asc' });
+    }
+  }
+
+  const sortIndicator = (key) => sort.key === key ? (sort.dir === 'asc' ? ' ↑' : ' ↓') : '';
+
+  // Totals (over the filtered set, plus a per-type breakdown over the full entries)
+  const filteredTotal = filtered.reduce((s, e) => s + (e.hours || 0), 0);
+  const totalsByType = {};
+  HOUR_TYPES.forEach(({ key }) => { totalsByType[key] = 0; });
+  entries.forEach((e) => { if (totalsByType[e.type] !== undefined) totalsByType[e.type] += (e.hours || 0); });
+  const grandTotal = Object.values(totalsByType).reduce((s, v) => s + v, 0);
+
+  const headerStyle = { padding: '8px 12px', textAlign: 'left', fontWeight: 700, fontSize: 11, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' };
+
+  return (
+    <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 20, marginBottom: 24 }}>
+      {/* Filter chips + add button */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          <FilterChip label={`All (${entries.length})`} active={typeFilter === 'all'} onClick={() => onTypeFilterChange('all')} />
+          {HOUR_TYPES.map((ht) => {
+            const count = entries.filter((e) => e.type === ht.key).length;
+            if (count === 0) return null;
+            return (
+              <FilterChip
+                key={ht.key}
+                label={`${ht.label} (${count})`}
+                active={typeFilter === ht.key}
+                onClick={() => onTypeFilterChange(ht.key)}
+                bg={ht.bg}
+                color={ht.color}
+              />
+            );
+          })}
+        </div>
+        <button onClick={onAddEntry} style={primaryBtnStyle}>+ Add Entry</button>
+      </div>
+
+      {/* Type-totals strip */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 16, padding: '12px 14px', background: '#f9fafb', borderRadius: 8, fontSize: 12 }}>
+        <div style={{ fontWeight: 700, color: '#111827' }}>
+          Grand Total: <span style={{ color: '#7c3aed' }}>{grandTotal} hrs</span>
+        </div>
+        {HOUR_TYPES.map((ht) => (
+          totalsByType[ht.key] > 0 && (
+            <div key={ht.key} style={{ color: '#6b7280' }}>
+              <span style={{ color: ht.color, fontWeight: 600 }}>{ht.label}:</span> {totalsByType[ht.key]} hrs
+            </div>
+          )
+        ))}
+      </div>
+
+      {sorted.length === 0 ? (
+        <div style={{ color: '#9ca3af', fontSize: 13, padding: '20px 0' }}>No entries to display.</div>
+      ) : (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
+                <th style={headerStyle} onClick={() => toggleSort('date')}>Date{sortIndicator('date')}</th>
+                <th style={headerStyle} onClick={() => toggleSort('type')}>Type{sortIndicator('type')}</th>
+                <th style={headerStyle} onClick={() => toggleSort('hours')}>Hours{sortIndicator('hours')}</th>
+                <th style={{ ...headerStyle, cursor: 'default' }}>Notes</th>
+                <th style={headerStyle} onClick={() => toggleSort('loggedBy')}>Logged by{sortIndicator('loggedBy')}</th>
+                <th style={{ ...headerStyle, cursor: 'default' }}></th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((e) => {
+                const cr = changeRequests.find((r) => r.entryId === e.id && r.status === 'pending');
+                const ht = HOUR_TYPES.find((t) => t.key === e.type);
+                const dateStr = new Date(e.date.seconds * 1000).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+                const loggedBy = e.createdBy?.role && e.createdBy.role !== 'intern'
+                  ? `${e.createdBy.name || e.createdBy.role} (${e.createdBy.role})`
+                  : 'Intern';
+                return (
+                  <tr key={e.id} style={{ borderBottom: '1px solid #f1f5f9', background: cr ? '#fffbeb' : '#fff' }}>
+                    <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{dateStr}</td>
+                    <td style={tdStyle}>
+                      <span style={{ padding: '2px 10px', borderRadius: 20, background: ht?.bg || '#f9fafb', color: ht?.color || '#374151', fontWeight: 600, fontSize: 12 }}>
+                        {ht?.label || e.type}
+                      </span>
+                    </td>
+                    <td style={{ ...tdStyle, fontWeight: 600 }}>{e.hours} hrs</td>
+                    <td style={{ ...tdStyle, color: '#6b7280', maxWidth: 280 }}>{e.notes || '—'}</td>
+                    <td style={{ ...tdStyle, color: '#6b7280', fontSize: 12 }}>{loggedBy}</td>
+                    <td style={tdStyle}>
+                      {cr && (
+                        <div style={{ fontSize: 12 }}>
+                          <div style={{ color: '#d97706', fontWeight: 600, marginBottom: 2 }}>Change requested</div>
+                          <div style={{ color: '#6b7280', marginBottom: 4 }}>{cr.reason}</div>
+                          <button
+                            onClick={() => onResolve(cr.id)}
+                            style={{ padding: '3px 10px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', fontSize: 12, cursor: 'pointer' }}
+                          >
+                            Mark resolved
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr style={{ borderTop: '2px solid #e5e7eb', background: '#f9fafb' }}>
+                <td style={{ ...tdStyle, fontWeight: 700, color: '#111827' }} colSpan={2}>
+                  {typeFilter === 'all' ? 'Filtered total' : `${HOUR_TYPES.find(t => t.key === typeFilter)?.label} total`}
+                </td>
+                <td style={{ ...tdStyle, fontWeight: 700, color: '#7c3aed' }}>{filteredTotal} hrs</td>
+                <td colSpan={3}></td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FilterChip({ label, active, onClick, bg, color }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        padding: '5px 12px',
+        borderRadius: 20,
+        border: '1px solid',
+        borderColor: active ? (color || '#7c3aed') : '#d1d5db',
+        background: active ? (bg || '#ede9fe') : '#fff',
+        color: active ? (color || '#6d28d9') : '#374151',
+        fontSize: 12,
+        fontWeight: active ? 700 : 500,
+        cursor: 'pointer',
+      }}
+    >
+      {label}
+    </button>
+  );
 }

@@ -37,9 +37,16 @@ export async function fetchInquiriesSince(sinceMs) {
 }
 
 export async function createInquiry(data) {
+  const { createdAt, ...rest } = data;
+  let createdAtValue = serverTimestamp();
+  if (createdAt instanceof Date && !Number.isNaN(createdAt.getTime())) {
+    createdAtValue = Timestamp.fromDate(createdAt);
+  } else if (createdAt && typeof createdAt.toMillis === 'function') {
+    createdAtValue = createdAt;
+  }
   const docRef = await addDoc(inquiriesRef, {
-    ...data,
-    createdAt: serverTimestamp(),
+    ...rest,
+    createdAt: createdAtValue,
     updatedAt: serverTimestamp(),
   });
 

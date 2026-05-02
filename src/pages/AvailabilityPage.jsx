@@ -19,9 +19,9 @@ function SaveIndicator({ state }) {
 }
 
 export default function AvailabilityPage({ onNav }) {
-  const { isAdmin, isIntern, isSupervisor, providerName, user, signOut } = useAuth();
+  const { isAdmin, isIntern, isAssociate, isSupervisor, providerName, user, signOut } = useAuth();
   const showNavTabs = !!onNav;
-  const hoursTabLabel = isIntern ? 'My Hours' : isSupervisor ? 'Intern Hours' : 'Hours';
+  const hoursTabLabel = (isIntern || isAssociate) ? 'My Hours' : isSupervisor ? 'Hours Log' : 'Hours';
 
   const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);

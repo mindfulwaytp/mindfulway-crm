@@ -4,6 +4,7 @@ import { db } from './firebase';
 export const EMPTY_INTERN_REQUIREMENTS = {
   supervisorName: '',
   startDate: '',
+  endDate: '', // applies to interns only
   totalHoursRequired: 0,
   directContactHoursRequired: 0,
   supervisionHoursRequired: 0,

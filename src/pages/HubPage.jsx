@@ -58,7 +58,7 @@ const HUB_ITEMS = [
   {
     id: 'personnel',
     label: 'Personnel',
-    description: 'Staff files, compliance requirements & intern hours',
+    description: 'Staff files, compliance requirements & hours log',
     path: '/personnel',
     adminOrSupervisor: true,
     color: '#7c3aed',

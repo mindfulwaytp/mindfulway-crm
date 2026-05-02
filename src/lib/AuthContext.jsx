@@ -10,7 +10,7 @@ const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
-  const [roles, setRoles] = useState([]);         // e.g. ['admin'] | ['provider'] | ['intern'] | ['supervisor', 'provider']
+  const [roles, setRoles] = useState([]);         // e.g. ['admin'] | ['provider'] | ['intern'] | ['associate', 'provider'] | ['supervisor', 'provider']
   const [providerName, setProviderName] = useState(null);
   const [loading, setLoading] = useState(true);
   const [accessDenied, setAccessDenied] = useState(false);
@@ -92,12 +92,13 @@ export function AuthProvider({ children }) {
   const isAdmin = roles.includes('admin');
   const isSupervisor = roles.includes('supervisor') || roles.includes('admin');
   const isIntern = roles.includes('intern');
+  const isAssociate = roles.includes('associate');
   const isProvider = roles.includes('provider');
 
   return (
     <AuthContext.Provider value={{
       user, roles, providerName, loading, accessDenied,
-      isAdmin, isSupervisor, isIntern, isProvider,
+      isAdmin, isSupervisor, isIntern, isAssociate, isProvider,
       signIn, signOut,
     }}>
       {children}
