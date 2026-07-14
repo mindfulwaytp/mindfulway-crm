@@ -2,14 +2,8 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../lib/AuthContext';
 import { fetchProviderProfiles, upsertProviderProfile } from '../lib/providersProfileApi';
 import NotificationBell from '../components/NotificationBell';
-
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const TIMES = ['Morning', 'Afternoon', 'Evening'];
-const DAY_SHORT = { Monday: 'Mon', Tuesday: 'Tue', Wednesday: 'Wed', Thursday: 'Thu', Friday: 'Fri', Saturday: 'Sat' };
-
-function toggle(arr, item) {
-  return arr.includes(item) ? arr.filter((x) => x !== item) : [...arr, item];
-}
+import { DAYS, SLOTS, getAvailability, toggleSlot, toProfileFields } from '../lib/availability';
+import { DayCell } from '../components/AvailabilityGrid';
 
 function SaveIndicator({ state }) {
   if (state === 'saving') return <span style={{ fontSize: 11, color: '#9ca3af' }}>Saving…</span>;
@@ -41,13 +35,13 @@ export default function AvailabilityPage({ onNav }) {
     return isAdmin || name === providerName;
   }
 
-  async function saveField(name, field, value) {
+  async function saveFields(name, fields) {
     setSaveState((s) => ({ ...s, [name]: 'saving' }));
     setProfiles((prev) =>
-      prev.map((p) => (p.name === name ? { ...p, [field]: value } : p))
+      prev.map((p) => (p.name === name ? { ...p, ...fields } : p))
     );
     try {
-      await upsertProviderProfile(name, { [field]: value });
+      await upsertProviderProfile(name, fields);
       setSaveState((s) => ({ ...s, [name]: 'saved' }));
       setTimeout(() => setSaveState((s) => ({ ...s, [name]: null })), 2000);
     } catch (e) {
@@ -56,12 +50,12 @@ export default function AvailabilityPage({ onNav }) {
     }
   }
 
-  function handleDayToggle(name, day, currentDays) {
-    saveField(name, 'availableDays', toggle(currentDays || [], day));
-  }
+  const saveField = (name, field, value) => saveFields(name, { [field]: value });
 
-  function handleTimeToggle(name, time, currentTimes) {
-    saveField(name, 'availableTimes', toggle(currentTimes || [], time));
+  /** Toggle one day+slot cell and persist the whole grid (plus derived fields). */
+  function handleSlotToggle(profile, day, slot) {
+    const next = toggleSlot(getAvailability(profile), day, slot);
+    saveFields(profile.name, toProfileFields(next));
   }
 
   function handleOpenSpacesChange(name, value) {
@@ -117,11 +111,24 @@ export default function AvailabilityPage({ onNav }) {
       <div style={{ padding: '40px 40px 32px' }}>
         <div style={{ marginBottom: 28 }}>
           <h1 style={{ margin: '0 0 12px', fontSize: 22, fontWeight: 700, color: '#111827', lineHeight: 1.3, letterSpacing: '0.01em' }}>Provider Availability</h1>
-          <p style={{ margin: 0, fontSize: 14, color: '#6b7280', lineHeight: 1.6 }}>
+          <p style={{ margin: '0 0 14px', fontSize: 14, color: '#6b7280', lineHeight: 1.6 }}>
             {isAdmin
               ? 'View and edit availability for all providers.'
-              : 'Update your available days, times, and open spots. Changes save automatically.'}
+              : 'Set which time slots you are available on each day, plus your open spots. Changes save automatically.'}
           </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', fontSize: 12, color: '#6b7280' }}>
+            <span style={{ fontWeight: 600 }}>Slots:</span>
+            {SLOTS.map((s) => (
+              <span key={s.key} style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+                <span style={{
+                  width: 20, height: 20, borderRadius: 5, fontSize: 10, fontWeight: 700,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  border: '1px solid #7c3aed', background: '#7c3aed', color: '#fff',
+                }}>{s.short}</span>
+                {s.label} <span style={{ color: '#9ca3af' }}>{s.hint}</span>
+              </span>
+            ))}
+          </div>
         </div>
 
         {!isAdmin && myProfile && (
@@ -149,10 +156,7 @@ export default function AvailabilityPage({ onNav }) {
                   <th style={thStyle}>Provider</th>
                   <th style={{ ...thStyle, width: 80 }}>Open Spots</th>
                   {DAYS.map((d) => (
-                    <th key={d} style={{ ...thStyle, width: 52 }}>{DAY_SHORT[d]}</th>
-                  ))}
-                  {TIMES.map((t) => (
-                    <th key={t} style={{ ...thStyle, width: 80 }}>{t}</th>
+                    <th key={d.key} style={{ ...thStyle, width: 76, textAlign: 'center' }}>{d.short}</th>
                   ))}
                   <th style={{ ...thStyle, width: 64 }}></th>
                 </tr>
@@ -161,8 +165,7 @@ export default function AvailabilityPage({ onNav }) {
                 {profiles.map((p) => {
                   const editable = canEdit(p.name);
                   const isOwnRow = p.name === providerName;
-                  const days = p.availableDays || [];
-                  const times = p.availableTimes || [];
+                  const grid = getAvailability(p);
                   const spaces = p.openSpaces ?? '';
 
                   return (
@@ -209,28 +212,14 @@ export default function AvailabilityPage({ onNav }) {
                         )}
                       </td>
 
-                      {/* Day checkboxes */}
-                      {DAYS.map((day) => (
-                        <td key={day} style={{ ...tdStyle, textAlign: 'center' }}>
-                          <input
-                            type="checkbox"
-                            checked={days.includes(day)}
-                            disabled={!editable}
-                            onChange={() => handleDayToggle(p.name, day, days)}
-                            style={{ width: 15, height: 15, cursor: editable ? 'pointer' : 'default', accentColor: '#7c3aed' }}
-                          />
-                        </td>
-                      ))}
-
-                      {/* Time checkboxes */}
-                      {TIMES.map((time) => (
-                        <td key={time} style={{ ...tdStyle, textAlign: 'center' }}>
-                          <input
-                            type="checkbox"
-                            checked={times.includes(time)}
-                            disabled={!editable}
-                            onChange={() => handleTimeToggle(p.name, time, times)}
-                            style={{ width: 15, height: 15, cursor: editable ? 'pointer' : 'default', accentColor: '#7c3aed' }}
+                      {/* One cell per day, each holding Morning/Afternoon/Evening toggles */}
+                      {DAYS.map((d) => (
+                        <td key={d.key} style={{ ...tdStyle, padding: '12px 6px' }}>
+                          <DayCell
+                            grid={grid}
+                            day={d.key}
+                            readOnly={!editable}
+                            onToggle={(day, slot) => handleSlotToggle(p, day, slot)}
                           />
                         </td>
                       ))}

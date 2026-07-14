@@ -1,9 +1,13 @@
 import { useState } from 'react';
-import { HOUR_TYPES } from '../lib/hourEntriesApi';
+import { HOUR_TYPES, todayDateStr, entryDateStr } from '../lib/hourEntriesApi';
 
-export default function HourEntryModal({ onClose, onSave, internName, title }) {
-  const today = new Date().toISOString().split('T')[0];
-  const [form, setForm] = useState({ date: today, type: 'direct_contact', hours: '', notes: '' });
+export default function HourEntryModal({ onClose, onSave, internName, title, entry }) {
+  const isEdit = !!entry;
+  const [form, setForm] = useState(() => (
+    isEdit
+      ? { date: entryDateStr(entry), type: entry.type, hours: String(entry.hours ?? ''), notes: entry.notes || '' }
+      : { date: todayDateStr(), type: 'direct_contact', hours: '', notes: '' }
+  ));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -25,7 +29,9 @@ export default function HourEntryModal({ onClose, onSave, internName, title }) {
   return (
     <div style={overlayStyle} onClick={onClose}>
       <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
-        <h2 style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 700 }}>{title || 'Add Hours Entry'}</h2>
+        <h2 style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 700 }}>
+          {title || (isEdit ? 'Edit Hours Entry' : 'Add Hours Entry')}
+        </h2>
         {internName && (
           <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 18 }}>For <strong style={{ color: '#374151' }}>{internName}</strong></div>
         )}
@@ -57,7 +63,9 @@ export default function HourEntryModal({ onClose, onSave, internName, title }) {
           {error && <div style={{ color: '#dc2626', fontSize: 13, marginBottom: 12 }}>{error}</div>}
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <button type="button" onClick={onClose} style={cancelBtnStyle}>Cancel</button>
-            <button type="submit" disabled={saving} style={primaryBtnStyle}>{saving ? 'Saving…' : 'Save Entry'}</button>
+            <button type="submit" disabled={saving} style={primaryBtnStyle}>
+              {saving ? 'Saving…' : (isEdit ? 'Save Changes' : 'Save Entry')}
+            </button>
           </div>
         </form>
       </div>

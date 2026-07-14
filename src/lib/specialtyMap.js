@@ -32,12 +32,19 @@ export const SPECIALTIES = [
   'Suicidality/Self-Harm',
   'Polyamory/Non-Monogamy',
   'Sexual Functioning',
+  'Chronic Illness',
+  'Perinatal/Postpartum',
 ];
 
 /**
- * Maps substrings found in raw JotForm checklist values → canonical specialty.
- * Keys are lowercase substrings; first match wins per raw item.
- * Add new entries here as new JotForm labels are discovered.
+ * Maps raw JotForm checklist values → canonical specialty.
+ *
+ * A key is either a lowercase SUBSTRING (so 'anxiet' catches both "Anxiety" and
+ * "Anxiousness") or a RegExp when a substring would over-match. FIRST MATCH WINS,
+ * so ORDER IS SIGNIFICANT: specific keys must precede the generic ones they
+ * contain. 'add' used to sit above 'addiction', which meant "Drug Addiction"
+ * matched on 'add' and was filed under ADHD/ADD — substance-use clients routed
+ * to ADHD specialists. It is now a word-boundary regex, and 'addiction' precedes it.
  */
 const CHECKLIST_MAP = [
   ['anxiet',          'Anxiety'],
@@ -47,9 +54,14 @@ const CHECKLIST_MAP = [
   ['trauma',          'Trauma/PTSD'],
   ['ptsd',            'Trauma/PTSD'],
   ['post-traumatic',  'Trauma/PTSD'],
+  // Substance keys come first: "Drug Addiction" must not be caught by /\badd\b/.
+  ['substance',       'Substance Use'],
+  ['alcohol',         'Substance Use'],
+  ['drug',            'Substance Use'],
+  ['addiction',       'Substance Use'],
   ['adhd',            'ADHD/ADD'],
   ['attention',       'ADHD/ADD'],
-  ['add',             'ADHD/ADD'],
+  [/\badd\b/,         'ADHD/ADD'],
   ['ocd',             'OCD'],
   ['obsessive',       'OCD'],
   ['compulsive',      'OCD'],
@@ -63,10 +75,6 @@ const CHECKLIST_MAP = [
   ['family',          'Family Conflict'],
   ['parenting',       'Parenting Issues'],
   ['parent',          'Parenting Issues'],
-  ['substance',       'Substance Use'],
-  ['alcohol',         'Substance Use'],
-  ['drug',            'Substance Use'],
-  ['addiction',       'Substance Use'],
   ['eating',          'Eating Disorders'],
   ['anorexia',        'Eating Disorders'],
   ['bulimia',         'Eating Disorders'],
@@ -104,6 +112,15 @@ const CHECKLIST_MAP = [
   ['non-monogamy',   'Polyamory/Non-Monogamy'],
   ['sexual',         'Sexual Functioning'],
   ['sexuality',       'Sexual Functioning'],
+  // Previously unmatched and silently dropped from scoring — 31 "Chronic Illness"
+  // inquiries alone contributed no specialty signal at all.
+  ['chronic',        'Chronic Illness'],
+  ['medical',        'Chronic Illness'],
+  ['infidelity',     'Relationship Issues'],
+  ['affair',         'Relationship Issues'],
+  ['postpartum',     'Perinatal/Postpartum'],
+  ['perinatal',      'Perinatal/Postpartum'],
+  ['pregnan',        'Perinatal/Postpartum'],
 ];
 
 /**
@@ -125,7 +142,8 @@ export function parseChecklist(raw) {
     const lower = item.toLowerCase();
     let found = false;
     for (const [keyword, specialty] of CHECKLIST_MAP) {
-      if (lower.includes(keyword)) {
+      const hit = keyword instanceof RegExp ? keyword.test(lower) : lower.includes(keyword);
+      if (hit) {
         matched.add(specialty);
         found = true;
         break;

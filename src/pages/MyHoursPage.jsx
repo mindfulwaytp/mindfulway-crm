@@ -2,12 +2,13 @@ import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../lib/AuthContext';
 import { fetchInternProfile } from '../lib/internProfilesApi';
 import {
-  HOUR_TYPES, fetchHourEntries, addHourEntry, submitChangeRequest,
-  getMondayOf, formatWeekLabel, entriesInWeek, sumByType,
+  HOUR_TYPES, fetchHourEntries, addHourEntry, updateHourEntry, deleteHourEntry, submitChangeRequest,
+  getMondayOf, shiftWeeks, formatWeekLabel, entriesInWeek, sumByType, formatEntryDate, isApproved,
 } from '../lib/hourEntriesApi';
 import HourEntryModal from '../components/HourEntryModal';
 import NotificationBell from '../components/NotificationBell';
 import HoursOverview from '../components/HoursOverview';
+import { SignOffBadge, EntryActions } from '../components/HourEntryActions';
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -31,7 +32,7 @@ function ChangeRequestModal({ entry, onClose, onSubmit }) {
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
   const ht = HOUR_TYPES.find((t) => t.key === entry.type);
-  const dateStr = new Date(entry.date.seconds * 1000).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  const dateStr = formatEntryDate(entry, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -46,7 +47,11 @@ function ChangeRequestModal({ entry, onClose, onSubmit }) {
 
   return (
     <Overlay onClose={onClose}>
-      <h2 style={{ margin: '0 0 16px', fontSize: 18, fontWeight: 700 }}>Request a Change</h2>
+      <h2 style={{ margin: '0 0 6px', fontSize: 18, fontWeight: 700 }}>Request a Change</h2>
+      <p style={{ margin: '0 0 16px', fontSize: 13, color: '#6b7280', lineHeight: 1.5 }}>
+        This entry has been signed off by your supervisor, so it can no longer be edited directly.
+        Send them a note describing what needs to change.
+      </p>
       <div style={{ background: '#f9fafb', borderRadius: 10, padding: '12px 16px', marginBottom: 20, fontSize: 13 }}>
         <div style={{ fontWeight: 600 }}>{dateStr}</div>
         <div style={{ color: '#6b7280', marginTop: 2 }}>{ht?.label} · {entry.hours} hrs{entry.notes ? ` · ${entry.notes}` : ''}</div>
@@ -96,8 +101,10 @@ export default function MyHoursPage({ onNav }) {
   const [loading, setLoading] = useState(true);
   const [monday, setMonday] = useState(() => getMondayOf(new Date()));
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editEntry, setEditEntry] = useState(null);     // entry being edited
   const [changeEntry, setChangeEntry] = useState(null); // entry to request change on
   const [pendingCRs, setPendingCRs] = useState(new Set()); // entry IDs with pending CRs
+  const [busyId, setBusyId] = useState(null);           // entry mid-delete
   const [hoursTab, setHoursTab] = useState('week'); // 'week' | 'overview'
   const [overviewSort, setOverviewSort] = useState({ key: 'date', dir: 'desc' });
   const [overviewTypeFilter, setOverviewTypeFilter] = useState('all');
@@ -126,6 +133,23 @@ export default function MyHoursPage({ onNav }) {
   async function handleAddEntry(form) {
     await addHourEntry({ internName: providerName, ...form });
     await load();
+  }
+
+  async function handleEditEntry(form) {
+    await updateHourEntry(editEntry.id, form);
+    await load();
+  }
+
+  async function handleDeleteEntry(entry) {
+    const label = `${formatEntryDate(entry)} · ${entry.hours} hrs`;
+    if (!window.confirm(`Delete this entry?\n\n${label}\n\nThis can't be undone.`)) return;
+    setBusyId(entry.id);
+    try {
+      await deleteHourEntry(entry.id);
+      await load();
+    } finally {
+      setBusyId(null);
+    }
   }
 
   async function handleChangeRequest(entryId, reason) {
@@ -157,7 +181,7 @@ export default function MyHoursPage({ onNav }) {
         </div>
       </div>
 
-      <div style={{ padding: '40px 40px 32px', maxWidth: 900 }}>
+      <div style={{ padding: '40px 40px 32px', maxWidth: hoursTab === 'overview' ? 1280 : 900, width: '100%' }}>
         <div style={{ marginBottom: 28 }}>
           <h1 style={{ margin: '0 0 8px', fontSize: 22, fontWeight: 700, letterSpacing: '0.01em' }}>
             {isAdmin || isSupervisor ? `${providerName} — Hours` : 'My Hours'}
@@ -214,9 +238,9 @@ export default function MyHoursPage({ onNav }) {
               <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 24 }}>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <button onClick={() => setMonday((m) => { const d = new Date(m); d.setDate(d.getDate() - 7); return d; })} style={navBtnStyle}>←</button>
+                    <button onClick={() => setMonday((m) => shiftWeeks(m, -1))} style={navBtnStyle}>←</button>
                     <span style={{ fontWeight: 600, fontSize: 14 }}>Week of {formatWeekLabel(monday)}</span>
-                    <button onClick={() => setMonday((m) => { const d = new Date(m); d.setDate(d.getDate() + 7); return d; })} style={navBtnStyle}>→</button>
+                    <button onClick={() => setMonday((m) => shiftWeeks(m, 1))} style={navBtnStyle}>→</button>
                   </div>
                   <button onClick={() => setShowAddModal(true)} style={primaryBtnStyle}>+ Add Entry</button>
                 </div>
@@ -227,7 +251,7 @@ export default function MyHoursPage({ onNav }) {
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                     <thead>
                       <tr style={{ borderBottom: '2px solid #e5e7eb' }}>
-                        {['Date', 'Type', 'Hours', 'Notes', ''].map((h) => (
+                        {['Date', 'Type', 'Hours', 'Notes', 'Status', ''].map((h) => (
                           <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, fontSize: 11, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
                         ))}
                       </tr>
@@ -236,9 +260,10 @@ export default function MyHoursPage({ onNav }) {
                       {weekEntries.map((e) => {
                         const ht = HOUR_TYPES.find((t) => t.key === e.type);
                         const hasPendingCR = pendingCRs.has(e.id);
-                        const dateStr = new Date(e.date.seconds * 1000).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                        const dateStr = formatEntryDate(e);
+                        const rowBg = hasPendingCR ? '#fffbeb' : (isApproved(e) ? '#f6fefb' : '#fff');
                         return (
-                          <tr key={e.id} style={{ borderBottom: '1px solid #f1f5f9', background: hasPendingCR ? '#fffbeb' : '#fff' }}>
+                          <tr key={e.id} style={{ borderBottom: '1px solid #f1f5f9', background: rowBg }}>
                             <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>{dateStr}</td>
                             <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
                               <span style={{ padding: '2px 10px', borderRadius: 20, background: ht?.bg || '#f9fafb', color: ht?.color || '#374151', fontWeight: 600, fontSize: 12 }}>
@@ -247,17 +272,16 @@ export default function MyHoursPage({ onNav }) {
                             </td>
                             <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>{e.hours} hrs</td>
                             <td style={{ padding: '10px 12px', verticalAlign: 'middle', color: '#6b7280' }}>{e.notes || '—'}</td>
+                            <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}><SignOffBadge entry={e} /></td>
                             <td style={{ padding: '10px 12px', verticalAlign: 'middle' }}>
-                              {hasPendingCR ? (
-                                <span style={{ fontSize: 11, color: '#d97706', fontWeight: 600 }}>Change requested</span>
-                              ) : (
-                                <button
-                                  onClick={() => setChangeEntry(e)}
-                                  style={{ fontSize: 12, padding: '3px 10px', borderRadius: 6, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', color: '#6b7280' }}
-                                >
-                                  Request change
-                                </button>
-                              )}
+                              <EntryActions
+                                entry={e}
+                                onEdit={setEditEntry}
+                                onDelete={handleDeleteEntry}
+                                onRequestChange={setChangeEntry}
+                                hasPendingCR={hasPendingCR}
+                                busy={busyId === e.id}
+                              />
                             </td>
                           </tr>
                         );
@@ -278,6 +302,10 @@ export default function MyHoursPage({ onNav }) {
                 onTypeFilterChange={setOverviewTypeFilter}
                 pendingCRIds={pendingCRs}
                 onRequestChange={(e) => setChangeEntry(e)}
+                onEdit={setEditEntry}
+                onDelete={handleDeleteEntry}
+                scopeName={providerName}
+                busyId={busyId}
               />
             )}
           </>
@@ -286,6 +314,9 @@ export default function MyHoursPage({ onNav }) {
 
       {showAddModal && (
         <HourEntryModal onClose={() => setShowAddModal(false)} onSave={handleAddEntry} />
+      )}
+      {editEntry && (
+        <HourEntryModal entry={editEntry} onClose={() => setEditEntry(null)} onSave={handleEditEntry} />
       )}
       {changeEntry && (
         <ChangeRequestModal entry={changeEntry} onClose={() => setChangeEntry(null)} onSubmit={handleChangeRequest} />

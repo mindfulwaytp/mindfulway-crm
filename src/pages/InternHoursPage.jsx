@@ -4,12 +4,16 @@ import { fetchProviderProfiles } from '../lib/providersProfileApi';
 import { fetchAllInternProfiles, upsertInternProfile, EMPTY_INTERN_REQUIREMENTS } from '../lib/internProfilesApi';
 import {
   HOUR_TYPES, fetchAllHourEntries, fetchAllChangeRequests, resolveChangeRequest,
-  addHourEntry, getMondayOf, formatWeekLabel, entriesInWeek, sumByType,
+  addHourEntry, updateHourEntry, deleteHourEntry, approveHourEntry, unapproveHourEntry,
+  getMondayOf, shiftWeeks, formatWeekLabel, entriesInWeek, sumByType,
+  formatEntryDate, formatDateStr, isApproved,
 } from '../lib/hourEntriesApi';
+import { downloadHoursCsv } from '../lib/exportHours';
 import { createNotification } from '../lib/notificationsApi';
 import HourEntryModal from '../components/HourEntryModal';
 import NotificationBell from '../components/NotificationBell';
 import HoursOverview from '../components/HoursOverview';
+import { SignOffBadge, EntryActions } from '../components/HourEntryActions';
 
 function ProgressBar({ logged, required, color }) {
   const pct = required > 0 ? Math.min(100, Math.round((logged / required) * 100)) : 0;
@@ -120,57 +124,128 @@ function WeekNav({ monday, onPrev, onNext }) {
   );
 }
 
-function EntriesTable({ entries, changeRequests, onResolve }) {
+function EntriesTable({ entries, changeRequests, onResolve, onEdit, onDelete, onApprove, onUnapprove, onApproveMany, busyId }) {
+  const [selected, setSelected] = useState(() => new Set());
+  const [signingOff, setSigningOff] = useState(false);
+
+  const selectable = entries.filter((e) => !isApproved(e));
+  const selectedEntries = selectable.filter((e) => selected.has(e.id));
+  const allSelected = selectable.length > 0 && selectedEntries.length === selectable.length;
+
   if (entries.length === 0) {
     return <div style={{ color: '#9ca3af', fontSize: 13, padding: '20px 0' }}>No entries for this week.</div>;
   }
+
+  function toggleOne(id) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  async function signOffSelected() {
+    setSigningOff(true);
+    try {
+      await onApproveMany(selectedEntries);
+      setSelected(new Set());
+    } finally {
+      setSigningOff(false);
+    }
+  }
+
   return (
-    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-      <thead>
-        <tr style={{ background: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
-          {['Date', 'Type', 'Hours', 'Notes', 'Logged by', ''].map((h) => (
-            <th key={h} style={{ padding: '8px 12px', textAlign: 'left', fontWeight: 700, fontSize: 11, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{h}</th>
-          ))}
-        </tr>
-      </thead>
-      <tbody>
-        {entries.map((e) => {
-          const cr = changeRequests.find((r) => r.entryId === e.id && r.status === 'pending');
-          const ht = HOUR_TYPES.find((t) => t.key === e.type);
-          const dateStr = new Date(e.date.seconds * 1000).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-          const loggedBy = e.createdBy?.role && e.createdBy.role !== 'intern'
-            ? `${e.createdBy.name || e.createdBy.role} (${e.createdBy.role})`
-            : 'Intern';
-          return (
-            <tr key={e.id} style={{ borderBottom: '1px solid #f1f5f9', background: cr ? '#fffbeb' : '#fff' }}>
-              <td style={tdStyle}>{dateStr}</td>
-              <td style={tdStyle}>
-                <span style={{ padding: '2px 10px', borderRadius: 20, background: ht?.bg || '#f9fafb', color: ht?.color || '#374151', fontWeight: 600, fontSize: 12 }}>
-                  {ht?.label || e.type}
-                </span>
-              </td>
-              <td style={tdStyle}>{e.hours} hrs</td>
-              <td style={{ ...tdStyle, color: '#6b7280', maxWidth: 220 }}>{e.notes || '—'}</td>
-              <td style={{ ...tdStyle, color: '#6b7280', fontSize: 12 }}>{loggedBy}</td>
-              <td style={tdStyle}>
-                {cr && (
-                  <div style={{ fontSize: 12 }}>
-                    <div style={{ color: '#d97706', fontWeight: 600, marginBottom: 2 }}>Change requested</div>
-                    <div style={{ color: '#6b7280', marginBottom: 4 }}>{cr.reason}</div>
-                    <button
-                      onClick={() => onResolve(cr.id)}
-                      style={{ padding: '3px 10px', borderRadius: 6, border: '1px solid #d1d5db', background: '#fff', fontSize: 12, cursor: 'pointer' }}
-                    >
-                      Mark resolved
-                    </button>
-                  </div>
-                )}
-              </td>
-            </tr>
-          );
-        })}
-      </tbody>
-    </table>
+    <>
+      {selectedEntries.length > 0 && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
+          marginBottom: 12, padding: '10px 14px', borderRadius: 10, background: '#ecfdf5', border: '1px solid #a7f3d0',
+        }}>
+          <span style={{ fontSize: 13, fontWeight: 600, color: '#047857' }}>
+            {selectedEntries.length} selected
+            <span style={{ fontWeight: 500, color: '#059669' }}>
+              {' · '}{selectedEntries.reduce((s, e) => s + (e.hours || 0), 0)} hrs
+            </span>
+          </span>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => setSelected(new Set())} disabled={signingOff} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontWeight: 600, fontSize: 12, cursor: 'pointer' }}>
+              Clear
+            </button>
+            <button
+              onClick={signOffSelected}
+              disabled={signingOff}
+              style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: '#059669', color: '#fff', fontWeight: 600, fontSize: 12, cursor: signingOff ? 'default' : 'pointer', opacity: signingOff ? 0.7 : 1 }}
+            >
+              {signingOff ? 'Signing off…' : `✓ Sign off ${selectedEntries.length} selected`}
+            </button>
+          </div>
+        </div>
+      )}
+      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+        <thead>
+          <tr style={{ background: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
+            <th style={{ ...thStyle, width: 34 }}>
+              <input
+                type="checkbox"
+                checked={allSelected}
+                onChange={() => setSelected(allSelected ? new Set() : new Set(selectable.map((e) => e.id)))}
+                disabled={selectable.length === 0}
+                title={allSelected ? 'Deselect all' : 'Select all entries awaiting sign-off'}
+                style={{ cursor: selectable.length === 0 ? 'default' : 'pointer' }}
+              />
+            </th>
+            {['Date', 'Type', 'Hours', 'Notes', 'Logged by', 'Status', ''].map((h) => (
+              <th key={h} style={thStyle}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {entries.map((e) => {
+            const cr = changeRequests.find((r) => r.entryId === e.id && r.status === 'pending');
+            const ht = HOUR_TYPES.find((t) => t.key === e.type);
+            const dateStr = formatEntryDate(e);
+            const approved = isApproved(e);
+            const isSelected = selected.has(e.id);
+            const loggedBy = e.createdBy?.role && e.createdBy.role !== 'intern'
+              ? `${e.createdBy.name || e.createdBy.role} (${e.createdBy.role})`
+              : 'Intern';
+            const rowBg = isSelected ? '#f0fdf4' : cr ? '#fffbeb' : approved ? '#f6fefb' : '#fff';
+            return (
+              <tr key={e.id} style={{ borderBottom: '1px solid #f1f5f9', background: rowBg }}>
+                <td style={tdStyle}>
+                  {!approved && (
+                    <input type="checkbox" checked={isSelected} onChange={() => toggleOne(e.id)} style={{ cursor: 'pointer' }} />
+                  )}
+                </td>
+                <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{dateStr}</td>
+                <td style={tdStyle}>
+                  <span style={{ padding: '2px 10px', borderRadius: 20, background: ht?.bg || '#f9fafb', color: ht?.color || '#374151', fontWeight: 600, fontSize: 12, whiteSpace: 'nowrap', display: 'inline-block' }}>
+                    {ht?.label || e.type}
+                  </span>
+                </td>
+                <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{e.hours} hrs</td>
+                <td style={{ ...tdStyle, color: '#6b7280', minWidth: 140 }}>{e.notes || '—'}</td>
+                <td style={{ ...tdStyle, color: '#6b7280', fontSize: 12 }}>{loggedBy}</td>
+                <td style={tdStyle}><SignOffBadge entry={e} /></td>
+                <td style={tdStyle}>
+                  <EntryActions
+                    entry={e}
+                    canApprove
+                    onEdit={onEdit}
+                    onDelete={onDelete}
+                    onApprove={onApprove}
+                    onUnapprove={onUnapprove}
+                    changeRequest={cr}
+                    onResolveCR={onResolve}
+                    busy={busyId === e.id}
+                  />
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </>
   );
 }
 
@@ -188,6 +263,8 @@ export default function InternHoursPage({ onNav }) {
   const [reqDraft, setReqDraft] = useState({});
   const [savingReq, setSavingReq] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [editEntry, setEditEntry] = useState(null);
+  const [busyId, setBusyId] = useState(null);
   const [overviewSort, setOverviewSort] = useState({ key: 'date', dir: 'desc' });
   const [overviewTypeFilter, setOverviewTypeFilter] = useState('all');
 
@@ -233,6 +310,13 @@ export default function InternHoursPage({ onNav }) {
     return [];
   }, [interns, internProfiles, isAdmin, isSupervisor, providerName]);
 
+  // Export must never leak interns the viewer isn't allowed to see, so it is
+  // scoped to visibleInterns rather than the full entry list.
+  const visibleEntries = useMemo(() => {
+    const names = new Set(visibleInterns.map((i) => i.name));
+    return allEntries.filter((e) => names.has(e.internName));
+  }, [allEntries, visibleInterns]);
+
   function selectIntern(name) {
     setSelected(name);
     setDetailTab('settings');
@@ -269,7 +353,7 @@ export default function InternHoursPage({ onNav }) {
     });
     try {
       const ht = HOUR_TYPES.find((t) => t.key === form.type);
-      const dateLabel = new Date(form.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      const dateLabel = formatDateStr(form.date);
       await createNotification({
         recipientProviderName: selected,
         type: 'hours_logged',
@@ -280,6 +364,85 @@ export default function InternHoursPage({ onNav }) {
       console.error('Failed to create notification', e);
     }
     await load();
+  }
+
+  async function handleEditEntry(form) {
+    await updateHourEntry(editEntry.id, form);
+    await load();
+  }
+
+  async function handleDeleteEntry(entry) {
+    const label = `${formatEntryDate(entry)} · ${entry.hours} hrs`;
+    if (!window.confirm(`Delete this entry for ${selected}?\n\n${label}\n\nThis can't be undone.`)) return;
+    setBusyId(entry.id);
+    try {
+      await deleteHourEntry(entry.id);
+      await load();
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  const approver = () => ({
+    uid: user?.uid || '',
+    providerName: providerName || '',
+    name: providerName || user?.email || '',
+    role: isAdmin ? 'admin' : 'supervisor',
+  });
+
+  /** Sign-off locks the entry: the intern can no longer edit or delete it. */
+  async function handleApprove(entry) {
+    setBusyId(entry.id);
+    try {
+      const { approvedAt, approvedBy } = await approveHourEntry(entry.id, approver());
+      setAllEntries((prev) => prev.map((e) => e.id === entry.id ? { ...e, approvedAt, approvedBy } : e));
+      await notifySignOff([entry]);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleApproveMany(entries) {
+    if (entries.length === 0) return;
+    const total = entries.reduce((s, e) => s + (e.hours || 0), 0);
+    if (!window.confirm(`Sign off ${entries.length} entr${entries.length === 1 ? 'y' : 'ies'} (${total} hrs) for ${selected}?\n\nThey will be locked and ${selected} won't be able to edit them.`)) return;
+    const by = approver();
+    const results = await Promise.all(entries.map((e) => approveHourEntry(e.id, by)));
+    const byId = new Map(entries.map((e, i) => [e.id, results[i]]));
+    setAllEntries((prev) => prev.map((e) => byId.has(e.id) ? { ...e, ...byId.get(e.id) } : e));
+    await notifySignOff(entries);
+  }
+
+  /** Reopening lets the intern correct a mistake that was signed off in error. */
+  async function handleUnapprove(entry) {
+    setBusyId(entry.id);
+    try {
+      await unapproveHourEntry(entry.id);
+      setAllEntries((prev) => prev.map((e) => {
+        if (e.id !== entry.id) return e;
+        const { approvedAt: _a, approvedBy: _b, ...rest } = e;
+        return rest;
+      }));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function notifySignOff(entries) {
+    const total = entries.reduce((s, e) => s + (e.hours || 0), 0);
+    const detail = entries.length === 1
+      ? `your ${entries[0].hours} hr entry on ${formatEntryDate(entries[0], { month: 'short', day: 'numeric' })}`
+      : `${entries.length} entries (${total} hrs)`;
+    try {
+      await createNotification({
+        recipientProviderName: selected,
+        type: 'hours_signed_off',
+        message: `${providerName || 'Your supervisor'} signed off on ${detail}. It can no longer be edited.`,
+        createdByName: providerName || '',
+      });
+    } catch (e) {
+      console.error('Failed to create notification', e);
+    }
   }
 
   // Header for standalone (non-admin) view
@@ -328,7 +491,7 @@ export default function InternHoursPage({ onNav }) {
     return (
       <div style={{ minHeight: onNav ? '100vh' : 'auto', background: '#f9fafb' }}>
         {standaloneHeader}
-        <div style={{ padding: '32px 40px', maxWidth: 960 }}>
+        <div style={{ padding: '32px 40px', maxWidth: 1280, width: '100%' }}>
           <button onClick={() => setSelected(null)} style={{ ...navBtnStyle, marginBottom: 20, padding: '6px 14px', fontSize: 13 }}>
             ← All Interns
           </button>
@@ -391,12 +554,22 @@ export default function InternHoursPage({ onNav }) {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
                 <WeekNav
                   monday={monday}
-                  onPrev={() => setMonday((m) => { const d = new Date(m); d.setDate(d.getDate() - 7); return d; })}
-                  onNext={() => setMonday((m) => { const d = new Date(m); d.setDate(d.getDate() + 7); return d; })}
+                  onPrev={() => setMonday((m) => shiftWeeks(m, -1))}
+                  onNext={() => setMonday((m) => shiftWeeks(m, 1))}
                 />
                 <button onClick={() => setShowAddModal(true)} style={primaryBtnStyle}>+ Add Entry</button>
               </div>
-              <EntriesTable entries={weekEntries} changeRequests={changeRequests} onResolve={handleResolve} />
+              <EntriesTable
+                entries={weekEntries}
+                changeRequests={changeRequests}
+                onResolve={handleResolve}
+                onEdit={setEditEntry}
+                onDelete={handleDeleteEntry}
+                onApprove={handleApprove}
+                onUnapprove={handleUnapprove}
+                onApproveMany={handleApproveMany}
+                busyId={busyId}
+              />
             </div>
           )}
 
@@ -410,6 +583,14 @@ export default function InternHoursPage({ onNav }) {
               onSortChange={setOverviewSort}
               typeFilter={overviewTypeFilter}
               onTypeFilterChange={setOverviewTypeFilter}
+              scopeName={selected}
+              canApprove
+              onApprove={handleApprove}
+              onApproveMany={handleApproveMany}
+              onUnapprove={handleUnapprove}
+              onEdit={setEditEntry}
+              onDelete={handleDeleteEntry}
+              busyId={busyId}
             />
           )}
 
@@ -425,7 +606,7 @@ export default function InternHoursPage({ onNav }) {
                   <div key={cr.id} style={{ borderBottom: '1px solid #fde68a', paddingBottom: 12, marginBottom: 12 }}>
                     {entry && (
                       <div style={{ fontSize: 13, marginBottom: 4 }}>
-                        {new Date(entry.date.seconds * 1000).toLocaleDateString()} · {HOUR_TYPES.find(t => t.key === entry.type)?.label} · {entry.hours} hrs
+                        {formatEntryDate(entry, { month: 'short', day: 'numeric', year: 'numeric' })} · {HOUR_TYPES.find(t => t.key === entry.type)?.label} · {entry.hours} hrs
                       </div>
                     )}
                     <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 6 }}>"{cr.reason}"</div>
@@ -447,6 +628,14 @@ export default function InternHoursPage({ onNav }) {
             onSave={handleAddEntry}
           />
         )}
+        {editEntry && (
+          <HourEntryModal
+            entry={editEntry}
+            internName={selected}
+            onClose={() => setEditEntry(null)}
+            onSave={handleEditEntry}
+          />
+        )}
       </div>
     );
   }
@@ -456,12 +645,25 @@ export default function InternHoursPage({ onNav }) {
     <div style={{ minHeight: onNav ? '100vh' : 'auto', background: '#f9fafb' }}>
       {standaloneHeader}
       <div style={{ padding: '32px 40px' }}>
-        <h1 style={{ margin: '0 0 8px', fontSize: 22, fontWeight: 700 }}>Hours Log</h1>
-        <p style={{ margin: '0 0 28px', fontSize: 14, color: '#6b7280' }}>
-          {isAdmin
-            ? 'Track progress for all interns and associates against their hour requirements.'
-            : 'Track progress for the interns and associates you supervise.'}
-        </p>
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
+          <div>
+            <h1 style={{ margin: '0 0 8px', fontSize: 22, fontWeight: 700 }}>Hours Log</h1>
+            <p style={{ margin: '0 0 28px', fontSize: 14, color: '#6b7280' }}>
+              {isAdmin
+                ? 'Track progress for all interns and associates against their hour requirements.'
+                : 'Track progress for the interns and associates you supervise.'}
+            </p>
+          </div>
+          {visibleEntries.length > 0 && (
+            <button
+              onClick={() => downloadHoursCsv(visibleEntries, isAdmin ? 'all-interns' : `${providerName}-supervisees`)}
+              title="Download every entry shown here — all interns, all weeks — as a CSV that opens in Excel"
+              style={{ padding: '8px 16px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontWeight: 600, fontSize: 13, cursor: 'pointer', whiteSpace: 'nowrap' }}
+            >
+              ↓ Export all hours ({visibleEntries.length})
+            </button>
+          )}
+        </div>
 
         {visibleInterns.length === 0 ? (
           <div style={{ color: '#9ca3af', fontSize: 14 }}>
@@ -479,6 +681,7 @@ export default function InternHoursPage({ onNav }) {
               const total = req.totalHoursRequired || 0;
               const pct = total > 0 ? Math.min(100, Math.round((totalLogged / total) * 100)) : 0;
               const pendingCount = changeRequests.filter((r) => r.internName === intern.name && r.status === 'pending').length;
+              const awaitingSignOff = entries.filter((e) => !isApproved(e)).length;
 
               const roles = Array.isArray(intern.roles) ? intern.roles : (intern.isIntern ? ['intern'] : []);
               const isAssoc = roles.includes('associate');
@@ -496,11 +699,18 @@ export default function InternHoursPage({ onNav }) {
                         {roleLabel}
                       </span>
                     </div>
-                    {pendingCount > 0 && (
-                      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#fef3c7', color: '#92400e', fontWeight: 600, border: '1px solid #fde68a' }}>
-                        {pendingCount} change request{pendingCount > 1 ? 's' : ''}
-                      </span>
-                    )}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}>
+                      {pendingCount > 0 && (
+                        <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#fef3c7', color: '#92400e', fontWeight: 600, border: '1px solid #fde68a', whiteSpace: 'nowrap' }}>
+                          {pendingCount} change request{pendingCount > 1 ? 's' : ''}
+                        </span>
+                      )}
+                      {awaitingSignOff > 0 && (
+                        <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 20, background: '#f3f4f6', color: '#4b5563', fontWeight: 600, border: '1px solid #e5e7eb', whiteSpace: 'nowrap' }}>
+                          {awaitingSignOff} awaiting sign-off
+                        </span>
+                      )}
+                    </div>
                   </div>
                   {req.supervisorName && (
                     <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 12 }}>Supervisor: {req.supervisorName}</div>
@@ -554,6 +764,11 @@ const navBtnStyle = {
 const tdStyle = {
   padding: '10px 12px',
   verticalAlign: 'top',
+};
+
+const thStyle = {
+  padding: '8px 12px', textAlign: 'left', fontWeight: 700, fontSize: 11, color: '#6b7280',
+  textTransform: 'uppercase', letterSpacing: '0.04em', whiteSpace: 'nowrap',
 };
 
 const primaryBtnStyle = {

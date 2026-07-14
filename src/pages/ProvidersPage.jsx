@@ -1,17 +1,13 @@
 import { useState, useEffect } from 'react';
 import { fetchProviderProfiles, upsertProviderProfile, deleteProviderProfile } from '../lib/providersProfileApi';
 import { SPECIALTIES } from '../lib/specialtyMap';
+import { getAvailability, toProfileFields, summarize } from '../lib/availability';
+import { INSURANCES } from '../lib/insurance';
+import AvailabilityGrid from '../components/AvailabilityGrid';
 
-const DAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const TIMES = ['Morning', 'Afternoon', 'Evening'];
 const MODALITIES = ['Individual', 'Couples', 'Family', 'Group', 'Child/Play'];
 const SESSION_FORMATS = ['In-Person', 'Telehealth'];
 const CLIENT_AGES = ['Children (0-12)', 'Adolescents (13-17)', 'Adults (18+)', 'Seniors (65+)'];
-const INSURANCES = [
-  'Premera', 'Regence', 'Other BCBS', 'Aetna', 'Cigna',
-  'UHC-Commercial', 'Molina-Commercial', 'Molina-Medicaid',
-  'UHC-Medicaid', 'Private Pay',
-];
 const LICENSURE_OPTIONS = [
   'LMFT', 'LCSW', 'LPC', 'LMHC', 'PhD', 'PsyD',
   'Associate/Intern', 'Psychiatrist (MD)', 'ARNP',
@@ -35,8 +31,9 @@ const EMPTY_PROFILE = {
   pronouns: '',
   licensure: '',
   openSpaces: 0,
-  availableDays: [],
-  availableTimes: [],
+  availability: {},          // { monday: ['afternoon','evening'], … } — source of truth
+  availableDays: [],         // derived from `availability`; kept for older readers
+  availableTimes: [],        // derived from `availability`
   modalities: [],
   sessionFormats: [],
   clientAges: [],
@@ -264,7 +261,7 @@ export default function ProvidersPage() {
             const summary = [
               p.licensure,
               p.modalities?.length > 0 ? p.modalities.join(', ') : null,
-              p.availableDays?.length > 0 ? p.availableDays.map((d) => d.slice(0, 3)).join(', ') : null,
+              summarize(getAvailability(p)),
             ].filter(Boolean).join(' · ');
 
             return (
@@ -433,17 +430,9 @@ export default function ProvidersPage() {
 
             {/* Availability */}
             <Section title="Availability">
-              <CheckboxGroup
-                label="Days"
-                options={DAYS}
-                selected={draft.availableDays}
-                onChange={(v) => setDraftField('availableDays', v)}
-              />
-              <CheckboxGroup
-                label="Times"
-                options={TIMES}
-                selected={draft.availableTimes}
-                onChange={(v) => setDraftField('availableTimes', v)}
+              <AvailabilityGrid
+                grid={getAvailability(draft)}
+                onChange={(next) => setDraft((d) => ({ ...d, ...toProfileFields(next) }))}
               />
             </Section>
 

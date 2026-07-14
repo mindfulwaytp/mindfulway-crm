@@ -78,19 +78,58 @@ service cloud.firestore {
     }
 
     // ── Hour entries ─────────────────────────────────────────────────────────
-    // - Intern: read/create own
+    // - Intern: read/create own; edit + delete own until it is signed off
+    // - Supervisor: same for assigned interns, plus sign-off / reopen
     // - Admin: full access
-    // - Supervisor: read/create for assigned interns only
     match /hourEntries/{entryId} {
+
+      function isOwnerOf(internName) {
+        return isSignedIn() && getUserData().providerName == internName;
+      }
+
+      function isSupervisorOf(internName) {
+        return hasRole('supervisor') &&
+          get(/databases/$(database)/documents/internProfiles/$(internName)).data.supervisorName == getUserData().providerName;
+      }
+
+      // A signed-off entry is locked — nobody but a supervisor/admin may touch it.
+      function isSignedOff() {
+        return resource.data.get('approvedAt', null) != null;
+      }
+
+      // True when the incoming write carries a sign-off stamp.
+      function claimsSignOff() {
+        return request.resource.data.get('approvedAt', null) != null;
+      }
+
+      // The only fields an intern may change on their own entry.
+      function onlyEditsOwnFields() {
+        return request.resource.data.diff(resource.data).affectedKeys()
+          .hasOnly(['date', 'type', 'hours', 'notes', 'updatedAt']);
+      }
+
       allow read: if isAdmin() ||
-        (isSignedIn() && getUserData().providerName == resource.data.internName) ||
-        (hasRole('supervisor') &&
-          get(/databases/$(database)/documents/internProfiles/$(resource.data.internName)).data.supervisorName == getUserData().providerName);
+        isOwnerOf(resource.data.internName) ||
+        isSupervisorOf(resource.data.internName);
+
+      // Interns may never create a pre-approved entry — only a supervisor can sign off.
       allow create: if isAdmin() ||
-        (isSignedIn() && getUserData().providerName == request.resource.data.internName) ||
-        (hasRole('supervisor') &&
-          get(/databases/$(database)/documents/internProfiles/$(request.resource.data.internName)).data.supervisorName == getUserData().providerName);
-      allow update, delete: if isAdmin();
+        isSupervisorOf(request.resource.data.internName) ||
+        (isOwnerOf(request.resource.data.internName) && !claimsSignOff());
+
+      // Supervisor/admin: full edit, plus sign-off and reopen.
+      allow update: if (isAdmin() || isSupervisorOf(resource.data.internName)) &&
+        request.resource.data.internName == resource.data.internName;
+
+      // Intern: may correct their own entry until it's signed off, and may never self-sign-off.
+      allow update: if isOwnerOf(resource.data.internName) &&
+        !isSignedOff() &&
+        !claimsSignOff() &&
+        onlyEditsOwnFields();
+
+      allow delete: if isAdmin() ||
+        isSupervisorOf(resource.data.internName) ||
+        (isOwnerOf(resource.data.internName) && !isSignedOff());
     }
 
     // ── Change requests — intern creates own; admin/supervisor manage ────────
