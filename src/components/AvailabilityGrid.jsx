@@ -102,9 +102,9 @@ export function DayCell({ grid, day, onToggle, readOnly = false }) {
             style={{
               width: 20, height: 20, borderRadius: 5, fontSize: 10, fontWeight: 700,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              border: `1px solid ${on ? '#7c3aed' : '#e5e7eb'}`,
-              background: on ? '#7c3aed' : '#fff',
-              color: on ? '#fff' : '#d1d5db',
+              border: `1px solid ${on ? '#3a93ed' : '#e5e7eb'}`,
+              background: on ? '#3a93ed' : '#fff',
+              color: on ? '#fff' : '#9ca3af',
               cursor: readOnly ? 'default' : 'pointer',
               padding: 0,
             }}
@@ -137,9 +137,9 @@ function dayBtnStyle(readOnly) {
 function cellStyle(on, readOnly) {
   return {
     height: 34, borderRadius: 8, fontSize: 14, fontWeight: 700,
-    border: `1px solid ${on ? '#7c3aed' : '#e5e7eb'}`,
+    border: `1px solid ${on ? '#3a93ed' : '#e5e7eb'}`,
     background: on ? '#ede9fe' : '#fff',
-    color: on ? '#6d28d9' : 'transparent',
+    color: on ? '#1a9742' : 'transparent',
     cursor: readOnly ? 'default' : 'pointer',
     transition: 'background 0.12s, border-color 0.12s',
   };

@@ -20,6 +20,7 @@ export default function AvailabilityPage({ onNav }) {
   const [profiles, setProfiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saveState, setSaveState] = useState({}); // { [name]: 'saving' | 'saved' | 'error' }
+  const [noteDrafts, setNoteDrafts] = useState({}); // in-flight text, keyed by provider
 
   useEffect(() => {
     fetchProviderProfiles()
@@ -60,6 +61,22 @@ export default function AvailabilityPage({ onNav }) {
 
   function handleOpenSpacesChange(name, value) {
     saveField(name, 'openSpaces', Number(value));
+  }
+
+  /**
+   * Free-text availability notes. Saved on blur rather than on every keystroke —
+   * a Firestore write per character would be wasteful and would make the "Saved"
+   * indicator flicker while typing.
+   */
+  function handleNoteBlur(profile) {
+    const draft = noteDrafts[profile.name];
+    if (draft === undefined) return;                       // never edited
+    if (draft === (profile.availabilityNotes || '')) {     // edited back to the same value
+      setNoteDrafts((d) => { const n = { ...d }; delete n[profile.name]; return n; });
+      return;
+    }
+    saveFields(profile.name, { availabilityNotes: draft });
+    setNoteDrafts((d) => { const n = { ...d }; delete n[profile.name]; return n; });
   }
 
   const myProfile = profiles.find((p) => p.name === providerName);
@@ -123,7 +140,7 @@ export default function AvailabilityPage({ onNav }) {
                 <span style={{
                   width: 20, height: 20, borderRadius: 5, fontSize: 10, fontWeight: 700,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  border: '1px solid #7c3aed', background: '#7c3aed', color: '#fff',
+                  border: '1px solid #3a93ed', background: '#3a93ed', color: '#fff',
                 }}>{s.short}</span>
                 {s.label} <span style={{ color: '#9ca3af' }}>{s.hint}</span>
               </span>
@@ -150,7 +167,7 @@ export default function AvailabilityPage({ onNav }) {
           <div style={{ color: '#6b7280', fontSize: 14 }}>Loading…</div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', minWidth: 980, borderCollapse: 'collapse', background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden', fontSize: 14 }}>
+            <table style={{ width: '100%', minWidth: 1240, borderCollapse: 'collapse', background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden', fontSize: 14 }}>
               <thead>
                 <tr style={{ background: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
                   <th style={{ ...thStyle, width: 220 }}>Provider</th>
@@ -158,10 +175,11 @@ export default function AvailabilityPage({ onNav }) {
                   {DAYS.map((d) => (
                     <th key={d.key} style={{ ...thStyle, ...dayColStyle, textAlign: 'center' }}>{d.short}</th>
                   ))}
+                  {/* Comments is the flexible column: it soaks up the slack on wide
+                      screens, so the fixed columns keep their widths and the extra
+                      room goes somewhere useful instead of into dead space. */}
+                  <th style={{ ...thStyle, width: '100%', minWidth: 340, borderLeft: DIVIDER }}>Comments</th>
                   <th style={{ ...thStyle, width: 72, borderLeft: DIVIDER }}></th>
-                  {/* Spacer: soaks up the slack on wide screens so the real columns
-                      keep their widths instead of the name column stretching. */}
-                  <th style={{ ...thStyle, width: '100%' }} aria-hidden="true"></th>
                 </tr>
               </thead>
               <tbody>
@@ -227,12 +245,39 @@ export default function AvailabilityPage({ onNav }) {
                         </td>
                       ))}
 
+                      {/* Comments — free text, never parsed for matching */}
+                      <td style={{ ...tdStyle, borderLeft: DIVIDER, padding: '8px 10px' }}>
+                        {editable ? (
+                          <textarea
+                            value={noteDrafts[p.name] ?? p.availabilityNotes ?? ''}
+                            onChange={(e) => setNoteDrafts((d) => ({ ...d, [p.name]: e.target.value }))}
+                            onBlur={() => handleNoteBlur(p)}
+                            rows={2}
+                            placeholder="e.g. Sundays are telehealth only; last Thu of the month unavailable"
+                            style={{
+                              width: '100%',
+                              padding: '6px 8px',
+                              borderRadius: 6,
+                              border: '1px solid #d1d5db',
+                              fontSize: 12,
+                              lineHeight: 1.45,
+                              color: '#111827',
+                              resize: 'vertical',
+                              fontFamily: 'inherit',
+                              boxSizing: 'border-box',
+                            }}
+                          />
+                        ) : (
+                          <span style={{ fontSize: 12, color: p.availabilityNotes ? '#374151' : '#d1d5db', lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>
+                            {p.availabilityNotes || '—'}
+                          </span>
+                        )}
+                      </td>
+
                       {/* Save indicator */}
                       <td style={{ ...tdStyle, textAlign: 'center', borderLeft: DIVIDER }}>
                         <SaveIndicator state={saveState[p.name]} />
                       </td>
-
-                      <td style={tdStyle} aria-hidden="true"></td>
                     </tr>
                   );
                 })}
