@@ -88,7 +88,7 @@ function Row({ children }) {
  */
 export function DayCell({ grid, day, onToggle, readOnly = false }) {
   return (
-    <div style={{ display: 'flex', gap: 2, justifyContent: 'center' }}>
+    <div style={{ display: 'flex', gap: 4, justifyContent: 'center' }}>
       {SLOTS.map((s) => {
         const on = hasSlot(grid, day, s.key);
         return (

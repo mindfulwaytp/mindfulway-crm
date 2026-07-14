@@ -150,15 +150,18 @@ export default function AvailabilityPage({ onNav }) {
           <div style={{ color: '#6b7280', fontSize: 14 }}>Loading…</div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden', fontSize: 14 }}>
+            <table style={{ width: '100%', minWidth: 980, borderCollapse: 'collapse', background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden', fontSize: 14 }}>
               <thead>
                 <tr style={{ background: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
-                  <th style={thStyle}>Provider</th>
-                  <th style={{ ...thStyle, width: 80 }}>Open Spots</th>
+                  <th style={{ ...thStyle, width: 220 }}>Provider</th>
+                  <th style={{ ...thStyle, width: 90, textAlign: 'center' }}>Open Spots</th>
                   {DAYS.map((d) => (
-                    <th key={d.key} style={{ ...thStyle, width: 76, textAlign: 'center' }}>{d.short}</th>
+                    <th key={d.key} style={{ ...thStyle, ...dayColStyle, textAlign: 'center' }}>{d.short}</th>
                   ))}
-                  <th style={{ ...thStyle, width: 64 }}></th>
+                  <th style={{ ...thStyle, width: 72, borderLeft: DIVIDER }}></th>
+                  {/* Spacer: soaks up the slack on wide screens so the real columns
+                      keep their widths instead of the name column stretching. */}
+                  <th style={{ ...thStyle, width: '100%' }} aria-hidden="true"></th>
                 </tr>
               </thead>
               <tbody>
@@ -214,7 +217,7 @@ export default function AvailabilityPage({ onNav }) {
 
                       {/* One cell per day, each holding Morning/Afternoon/Evening toggles */}
                       {DAYS.map((d) => (
-                        <td key={d.key} style={{ ...tdStyle, padding: '12px 6px' }}>
+                        <td key={d.key} style={{ ...tdStyle, ...dayColStyle }}>
                           <DayCell
                             grid={grid}
                             day={d.key}
@@ -225,9 +228,11 @@ export default function AvailabilityPage({ onNav }) {
                       ))}
 
                       {/* Save indicator */}
-                      <td style={{ ...tdStyle, textAlign: 'center' }}>
+                      <td style={{ ...tdStyle, textAlign: 'center', borderLeft: DIVIDER }}>
                         <SaveIndicator state={saveState[p.name]} />
                       </td>
+
+                      <td style={tdStyle} aria-hidden="true"></td>
                     </tr>
                   );
                 })}
@@ -266,6 +271,16 @@ const thStyle = {
 const tdStyle = {
   padding: '12px 16px',
   verticalAlign: 'middle',
+};
+
+const DIVIDER = '1px solid #e5e7eb';
+
+// Each day is its own column of M/A/E toggles; without a rule between them the
+// 21 pills read as one undifferentiated block.
+const dayColStyle = {
+  width: 84,
+  padding: '12px 10px',
+  borderLeft: DIVIDER,
 };
 
 function tabStyle(active) {
