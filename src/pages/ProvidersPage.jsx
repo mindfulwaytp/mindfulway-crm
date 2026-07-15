@@ -150,6 +150,9 @@ export default function ProvidersPage() {
     setSaveError(null);
     try {
       const { name: _name, id: _id, updatedAt: _ua, ...dataToSave } = draft;
+      // Trim the email so a stray copy-paste space can't break sign-in matching,
+      // which pairs this profile to the provider's Google account.
+      if (typeof dataToSave.email === 'string') dataToSave.email = dataToSave.email.trim();
       await upsertProviderProfile(editingProvider, dataToSave);
       setProfiles((prev) => ({ ...prev, [editingProvider]: { ...draft, name: editingProvider } }));
       setSuccessMsg(`${editingProvider}'s profile saved.`);

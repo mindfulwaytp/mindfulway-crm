@@ -7,6 +7,11 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebase';
 
+/** Email addresses are case-insensitive in practice; compare them normalized. */
+function normalizeEmail(e) {
+  return (e || '').trim().toLowerCase();
+}
+
 /**
  * Resolves roles for a signed-in user.
  * Returns { email, roles: [], providerName } or null if no access.
@@ -21,9 +26,15 @@ export async function getOrCreateUserRole(uid, email) {
   // For users tied to a provider, always re-sync roles from the provider doc.
   // This way, role changes on the Providers page propagate on next sign-in
   // instead of being permanently cached at signup time.
+  //
+  // Match on a normalized email: the provider profile stores whatever casing/
+  // whitespace was typed, but Google returns a canonical lowercase address, so
+  // an exact === would spuriously reject a provider whose profile reads
+  // "John.Smith@…" or has a stray trailing space.
+  const target = normalizeEmail(email);
   const providersSnap = await getDocs(collection(db, 'providers'));
   const matchingProvider = providersSnap.docs.find(
-    (d) => d.data().email === email
+    (d) => normalizeEmail(d.data().email) === target
   );
   if (matchingProvider) {
     const providerData = matchingProvider.data();
@@ -53,7 +64,8 @@ export async function getOrCreateUserRole(uid, email) {
 
   // 3. Check config/admins for admin email list
   const adminConfigSnap = await getDoc(doc(db, 'config', 'admins'));
-  if (adminConfigSnap.exists() && adminConfigSnap.data().emails?.includes(email)) {
+  const adminEmails = (adminConfigSnap.exists() ? adminConfigSnap.data().emails : []) || [];
+  if (adminEmails.some((e) => normalizeEmail(e) === target)) {
     const userData = { email, roles: ['admin'], providerName: null };
     await setDoc(userRef, userData);
     return userData;
