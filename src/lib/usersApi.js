@@ -49,7 +49,16 @@ export async function getOrCreateUserRole(uid, email) {
       existingRoles.length !== roles.length ||
       existingRoles.some((r) => !roles.includes(r));
     if (rolesChanged) {
-      await setDoc(userRef, userData, { merge: true });
+      // The users doc is only a CACHE — roles are recomputed from the provider
+      // doc on every sign-in. Non-admins can create this doc but the rules forbid
+      // them updating it, so a re-sync write throws with "permission denied" for
+      // any provider whose cached doc already exists and has drifted. That must
+      // NOT block sign-in: fall back to the freshly computed roles in memory.
+      try {
+        await setDoc(userRef, userData, { merge: true });
+      } catch (e) {
+        console.warn('Could not persist role cache for', email, '- using live roles.', e);
+      }
     }
     return userData;
   }
