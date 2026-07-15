@@ -1695,11 +1695,23 @@ function AdminApp({ signOut, intakes, setIntakes, providerProfiles, setProviderP
 
   const totalPages = Math.ceil(filteredInquiries.length / PAGE_SIZE);
 
-  const viewOptions = useMemo(() => ({
-    status: [...new Set(intakes.map(r => r.pipeline?.status).filter(Boolean))].sort(),
-    insurance: [...new Set(intakes.map(r => r.intake?.insurance).filter(Boolean))].sort(),
-    provider: [...new Set(intakes.map(r => r.pipeline?.assignedProvider).filter(Boolean))].sort(),
-  }), [intakes]);
+  const viewOptions = useMemo(() => {
+    // Assigned-provider names live on the inquiries forever (we never rewrite
+    // history), so this list would otherwise grow without bound as clinicians
+    // leave. Split it against the CURRENT providers collection: active names
+    // stay at the top; names that no longer exist as a provider are still
+    // filterable but grouped under "Former" so the list stays manageable.
+    const currentNames = new Set((providerProfiles || []).map(p => p.name).filter(Boolean));
+    const assigned = [...new Set(intakes.map(r => r.pipeline?.assignedProvider).filter(Boolean))].sort();
+    return {
+      status: [...new Set(intakes.map(r => r.pipeline?.status).filter(Boolean))].sort(),
+      insurance: [...new Set(intakes.map(r => r.intake?.insurance).filter(Boolean))].sort(),
+      provider: {
+        active: assigned.filter(n => currentNames.has(n)),
+        former: assigned.filter(n => !currentNames.has(n)),
+      },
+    };
+  }, [intakes, providerProfiles]);
 
   if (loading) {
     return <main style={{ padding: 24 }}>Loading...</main>;
@@ -2524,7 +2536,12 @@ function AdminApp({ signOut, intakes, setIntakes, providerProfiles, setProviderP
                     style={{ padding: '4px 10px', borderRadius: 20, border: '1px solid', borderColor: activeView.type === 'provider' ? '#7c3aed' : '#d1d5db', fontSize: 13, cursor: 'pointer', background: activeView.type === 'provider' ? '#ede9fe' : '#fff', color: activeView.type === 'provider' ? '#6d28d9' : '#374151' }}
                   >
                     <option value="">Assigned Provider</option>
-                    {viewOptions.provider.map(v => <option key={v} value={v}>{v} ({intakes.filter(r => r.pipeline?.assignedProvider === v).length})</option>)}
+                    {viewOptions.provider.active.map(v => <option key={v} value={v}>{v} ({intakes.filter(r => r.pipeline?.assignedProvider === v).length})</option>)}
+                    {viewOptions.provider.former.length > 0 && (
+                      <optgroup label="Former providers">
+                        {viewOptions.provider.former.map(v => <option key={v} value={v}>{v} ({intakes.filter(r => r.pipeline?.assignedProvider === v).length})</option>)}
+                      </optgroup>
+                    )}
                   </select>
                 </div>
               </div>
