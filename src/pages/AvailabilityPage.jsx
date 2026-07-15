@@ -59,8 +59,9 @@ export default function AvailabilityPage({ onNav }) {
     saveFields(profile.name, toProfileFields(next));
   }
 
-  function handleOpenSpacesChange(name, value) {
-    saveField(name, 'openSpaces', Number(value));
+  /** Persist a numeric spot count (open / sliding-fee / pro-bono). */
+  function handleSpotsChange(name, field, value) {
+    saveField(name, field, value === '' ? 0 : Number(value));
   }
 
   /**
@@ -167,11 +168,12 @@ export default function AvailabilityPage({ onNav }) {
           <div style={{ color: '#6b7280', fontSize: 14 }}>Loading…</div>
         ) : (
           <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', minWidth: 1240, borderCollapse: 'collapse', background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden', fontSize: 14 }}>
+            <table style={{ width: '100%', minWidth: 1390, borderCollapse: 'collapse', background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden', fontSize: 14 }}>
               <thead>
                 <tr style={{ background: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
                   <th style={{ ...thStyle, width: 220 }}>Provider</th>
                   <th style={{ ...thStyle, width: 90, textAlign: 'center' }}>Open Spots</th>
+                  <th style={{ ...thStyle, width: 150, borderLeft: DIVIDER }}>Fee Spots</th>
                   {DAYS.map((d) => (
                     <th key={d.key} style={{ ...thStyle, ...dayColStyle, textAlign: 'center' }}>{d.short}</th>
                   ))}
@@ -216,7 +218,7 @@ export default function AvailabilityPage({ onNav }) {
                             type="number"
                             min={0}
                             value={spaces}
-                            onChange={(e) => handleOpenSpacesChange(p.name, e.target.value)}
+                            onChange={(e) => handleSpotsChange(p.name, 'openSpaces', e.target.value)}
                             style={{
                               width: 52,
                               padding: '4px 6px',
@@ -231,6 +233,24 @@ export default function AvailabilityPage({ onNav }) {
                         ) : (
                           <OpenBadge count={spaces} />
                         )}
+                      </td>
+
+                      {/* Fee Spots — sliding-fee and pro-bono openings, stacked */}
+                      <td style={{ ...tdStyle, borderLeft: DIVIDER, padding: '8px 12px' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          <LabeledSpot
+                            label="Sliding Fee"
+                            value={p.slidingFeeSpots}
+                            editable={editable}
+                            onChange={(v) => handleSpotsChange(p.name, 'slidingFeeSpots', v)}
+                          />
+                          <LabeledSpot
+                            label="Pro Bono"
+                            value={p.proBonoSpots}
+                            editable={editable}
+                            onChange={(v) => handleSpotsChange(p.name, 'proBonoSpots', v)}
+                          />
+                        </div>
                       </td>
 
                       {/* One cell per day, each holding Morning/Afternoon/Evening toggles */}
@@ -298,6 +318,42 @@ function OpenBadge({ count }) {
   return (
     <span style={{ padding: '2px 9px', borderRadius: 20, background: bg, color, fontWeight: 700, fontSize: 12, border: `1px solid ${color}22` }}>
       {n === 0 ? 'Full' : n}
+    </span>
+  );
+}
+
+/** One labelled spot count, laid out to stack cleanly with siblings in a column. */
+function LabeledSpot({ label, value, editable, onChange }) {
+  const v = value ?? '';
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+      <span style={{ fontSize: 11, color: '#6b7280', fontWeight: 600, whiteSpace: 'nowrap' }}>{label}</span>
+      {editable ? (
+        <input
+          type="number"
+          min={0}
+          value={v}
+          onChange={(e) => onChange(e.target.value)}
+          style={{
+            width: 46, padding: '3px 6px', borderRadius: 6, border: '1px solid #d1d5db',
+            fontSize: 13, textAlign: 'center', color: '#111827',
+          }}
+        />
+      ) : (
+        <FeeSpotBadge count={v} />
+      )}
+    </div>
+  );
+}
+
+/** Read-only badge for sliding-fee / pro-bono counts. Zero here just means "none offered". */
+function FeeSpotBadge({ count }) {
+  if (count === '' || count === undefined || count === null) return <span style={{ color: '#9ca3af', fontSize: 12 }}>—</span>;
+  const n = Number(count);
+  const has = n > 0;
+  return (
+    <span style={{ padding: '2px 9px', borderRadius: 20, background: has ? '#ecfdf5' : '#f3f4f6', color: has ? '#059669' : '#9ca3af', fontWeight: 700, fontSize: 12, border: `1px solid ${has ? '#05966922' : '#e5e7eb'}` }}>
+      {n}
     </span>
   );
 }

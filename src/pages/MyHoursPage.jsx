@@ -3,11 +3,13 @@ import { useAuth } from '../lib/AuthContext';
 import { fetchInternProfile } from '../lib/internProfilesApi';
 import {
   HOUR_TYPES, fetchHourEntries, addHourEntry, updateHourEntry, deleteHourEntry, submitChangeRequest,
-  getMondayOf, shiftWeeks, formatWeekLabel, entriesInWeek, sumByType, formatEntryDate, isApproved,
+  getMondayOf, entriesInWeek, formatEntryDate, isApproved,
+  progressByType, totalLoggedHours, directCreditTypes, creditLabel,
 } from '../lib/hourEntriesApi';
 import HourEntryModal from '../components/HourEntryModal';
 import NotificationBell from '../components/NotificationBell';
 import HoursOverview from '../components/HoursOverview';
+import WeekNav from '../components/WeekNav';
 import { SignOffBadge, EntryActions } from '../components/HourEntryActions';
 
 // ── Sub-components ────────────────────────────────────────────────────────────
@@ -126,8 +128,11 @@ export default function MyHoursPage({ onNav }) {
 
   useEffect(() => { load(); }, [load]);
 
-  const totals = sumByType(entries);
-  const totalLogged = Object.values(totals).reduce((s, v) => s + v, 0);
+  // Progress bars use credited hours (group/relational may also count toward
+  // Direct Contact); the total counts each entry once, so it never double-counts.
+  const totals = progressByType(entries, requirements);
+  const totalLogged = totalLoggedHours(entries);
+  const creditedTypes = directCreditTypes(requirements);
   const weekEntries = entriesInWeek(entries, monday);
 
   async function handleAddEntry(form) {
@@ -207,14 +212,32 @@ export default function MyHoursPage({ onNav }) {
                   {HOUR_TYPES.map(({ key, label, reqField, color }) => {
                     const req = requirements[reqField] || 0;
                     if (req === 0) return null;
+                    const credits = key === 'direct_contact' ? creditedTypes : [];
                     return (
                       <div key={key}>
-                        <div style={{ fontSize: 12, color: '#6b7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>{label}</div>
+                        <div style={{ fontSize: 12, color: '#6b7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
+                          {label}
+                          {credits.length > 0 && (
+                            <span
+                              title={`Your ${creditLabel(credits)} hours also count toward Direct Contact. They are counted once in your total.`}
+                              style={{ marginLeft: 6, padding: '1px 6px', borderRadius: 20, background: '#eff6ff', color: '#1d4ed8', fontWeight: 700, fontSize: 10, textTransform: 'none', letterSpacing: 0 }}
+                            >
+                              + {creditLabel(credits)}
+                            </span>
+                          )}
+                        </div>
                         <ProgressBar logged={totals[key] || 0} required={req} color={color} />
                       </div>
                     );
                   })}
                 </div>
+                {creditedTypes.length > 0 && (
+                  <div style={{ marginTop: 14, fontSize: 12, color: '#6b7280', lineHeight: 1.5 }}>
+                    Your <strong style={{ color: '#374151' }}>{creditLabel(creditedTypes)}</strong> hours also count toward
+                    your <strong style={{ color: '#374151' }}>Direct Contact</strong> requirement. They still count only
+                    once toward your total hours.
+                  </div>
+                )}
                 {requirements.supervisorName && (
                   <div style={{ marginTop: 16, paddingTop: 16, borderTop: '1px solid #f1f5f9', fontSize: 13, color: '#6b7280' }}>
                     Supervisor: <strong style={{ color: '#374151' }}>{requirements.supervisorName}</strong>
@@ -236,12 +259,8 @@ export default function MyHoursPage({ onNav }) {
 
             {hoursTab === 'week' && (
               <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 24 }}>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <button onClick={() => setMonday((m) => shiftWeeks(m, -1))} style={navBtnStyle}>←</button>
-                    <span style={{ fontWeight: 600, fontSize: 14 }}>Week of {formatWeekLabel(monday)}</span>
-                    <button onClick={() => setMonday((m) => shiftWeeks(m, 1))} style={navBtnStyle}>→</button>
-                  </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, gap: 12, flexWrap: 'wrap' }}>
+                  <WeekNav monday={monday} onChange={setMonday} />
                   <button onClick={() => setShowAddModal(true)} style={primaryBtnStyle}>+ Add Entry</button>
                 </div>
 
@@ -342,10 +361,6 @@ const cancelBtnStyle = {
   background: '#fff', color: '#374151', fontWeight: 600, fontSize: 13, cursor: 'pointer',
 };
 
-const navBtnStyle = {
-  padding: '5px 12px', borderRadius: 8, border: '1px solid #e5e7eb',
-  background: '#fff', cursor: 'pointer', fontSize: 14, color: '#374151',
-};
 
 function tabStyle(active) {
   return {

@@ -5,14 +5,16 @@ import { fetchAllInternProfiles, upsertInternProfile, EMPTY_INTERN_REQUIREMENTS 
 import {
   HOUR_TYPES, fetchAllHourEntries, fetchAllChangeRequests, resolveChangeRequest,
   addHourEntry, updateHourEntry, deleteHourEntry, approveHourEntry, unapproveHourEntry,
-  getMondayOf, shiftWeeks, formatWeekLabel, entriesInWeek, sumByType,
+  getMondayOf, entriesInWeek,
   formatEntryDate, formatDateStr, isApproved,
+  CREDITABLE_TO_DIRECT, progressByType, totalLoggedHours, directCreditTypes, creditLabel,
 } from '../lib/hourEntriesApi';
 import { downloadHoursCsv } from '../lib/exportHours';
 import { createNotification } from '../lib/notificationsApi';
 import HourEntryModal from '../components/HourEntryModal';
 import NotificationBell from '../components/NotificationBell';
 import HoursOverview from '../components/HoursOverview';
+import WeekNav from '../components/WeekNav';
 import { SignOffBadge, EntryActions } from '../components/HourEntryActions';
 
 function ProgressBar({ logged, required, color }) {
@@ -101,6 +103,41 @@ function RequirementsForm({ draft, onChange, onSave, saving, supervisorOptions, 
           </label>
         )}
       </div>
+
+      {/* Direct-contact credit — off unless a board/licensure rule allows it */}
+      <div style={{ padding: '14px 16px', background: '#f9fafb', border: '1px solid #e5e7eb', borderRadius: 10, marginBottom: 16 }}>
+        <div style={{ fontSize: 12, color: '#6b7280', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>
+          Counts toward Direct Contact
+        </div>
+        <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
+          {CREDITABLE_TO_DIRECT.map((typeKey) => {
+            const ht = HOUR_TYPES.find((t) => t.key === typeKey);
+            const on = (draft.directCreditTypes || []).includes(typeKey);
+            return (
+              <label key={typeKey} style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13, color: '#374151', cursor: canEdit ? 'pointer' : 'default' }}>
+                <input
+                  type="checkbox"
+                  checked={on}
+                  disabled={!canEdit}
+                  onChange={() => {
+                    const current = draft.directCreditTypes || [];
+                    onChange('directCreditTypes', on
+                      ? current.filter((t) => t !== typeKey)
+                      : [...current, typeKey]);
+                  }}
+                  style={{ width: 15, height: 15, accentColor: '#7c3aed', cursor: canEdit ? 'pointer' : 'default' }}
+                />
+                <span style={{ color: ht?.color, fontWeight: 600 }}>{ht?.label}</span>
+              </label>
+            );
+          })}
+        </div>
+        <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 8, lineHeight: 1.5 }}>
+          Checked hour types count toward the Direct Contact requirement <em>in addition to</em> their own.
+          They are still counted only once toward total hours — never double-counted.
+        </div>
+      </div>
+
       {canEdit && (
         <button
           onClick={onSave}
@@ -110,16 +147,6 @@ function RequirementsForm({ draft, onChange, onSave, saving, supervisorOptions, 
           {saving ? 'Saving…' : 'Save Requirements'}
         </button>
       )}
-    </div>
-  );
-}
-
-function WeekNav({ monday, onPrev, onNext }) {
-  return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-      <button onClick={onPrev} style={navBtnStyle}>←</button>
-      <span style={{ fontWeight: 600, fontSize: 14 }}>Week of {formatWeekLabel(monday)}</span>
-      <button onClick={onNext} style={navBtnStyle}>→</button>
     </div>
   );
 }
@@ -484,8 +511,10 @@ export default function InternHoursPage({ onNav }) {
     const isInternRole = selectedRoles.includes('intern');
     const internEntries = allEntries.filter((e) => e.internName === selected);
     const weekEntries = entriesInWeek(internEntries, monday);
-    const totals = sumByType(internEntries);
-    const totalLogged = Object.values(totals).reduce((s, v) => s + v, 0);
+    // Bars show credited hours; the total counts each entry once.
+    const totals = progressByType(internEntries, req);
+    const totalLogged = totalLoggedHours(internEntries);
+    const creditedTypes = directCreditTypes(req);
     const pendingCRs = changeRequests.filter((r) => r.internName === selected && r.status === 'pending');
 
     return (
@@ -521,9 +550,20 @@ export default function InternHoursPage({ onNav }) {
             {HOUR_TYPES.map(({ key, label, reqField, color }) => {
               const req_hours = req[reqField] || 0;
               if (req_hours === 0) return null;
+              const credited = key === 'direct_contact' && creditedTypes.length > 0;
               return (
                 <div key={key} style={{ marginBottom: 8 }}>
-                  <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 3 }}>{label}</div>
+                  <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 3 }}>
+                    {label}
+                    {credited && (
+                      <span
+                        title={`${creditLabel(creditedTypes)} hours also count toward Direct Contact for ${selected}. They are counted once in the total.`}
+                        style={{ marginLeft: 6, padding: '1px 6px', borderRadius: 20, background: '#eff6ff', color: '#1d4ed8', fontWeight: 700, fontSize: 10 }}
+                      >
+                        + {creditLabel(creditedTypes)}
+                      </span>
+                    )}
+                  </div>
                   <ProgressBar logged={totals[key] || 0} required={req_hours} color={color} />
                 </div>
               );
@@ -551,12 +591,8 @@ export default function InternHoursPage({ onNav }) {
 
           {detailTab === 'week' && (
             <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 20, marginBottom: 24 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-                <WeekNav
-                  monday={monday}
-                  onPrev={() => setMonday((m) => shiftWeeks(m, -1))}
-                  onNext={() => setMonday((m) => shiftWeeks(m, 1))}
-                />
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16, gap: 12, flexWrap: 'wrap' }}>
+                <WeekNav monday={monday} onChange={setMonday} />
                 <button onClick={() => setShowAddModal(true)} style={primaryBtnStyle}>+ Add Entry</button>
               </div>
               <EntriesTable
@@ -676,8 +712,8 @@ export default function InternHoursPage({ onNav }) {
             {visibleInterns.map((intern) => {
               const req = internProfiles[intern.name] || {};
               const entries = allEntries.filter((e) => e.internName === intern.name);
-              const totals = sumByType(entries);
-              const totalLogged = Object.values(totals).reduce((s, v) => s + v, 0);
+              const totals = progressByType(entries, req);
+              const totalLogged = totalLoggedHours(entries);
               const total = req.totalHoursRequired || 0;
               const pct = total > 0 ? Math.min(100, Math.round((totalLogged / total) * 100)) : 0;
               const pendingCount = changeRequests.filter((r) => r.internName === intern.name && r.status === 'pending').length;

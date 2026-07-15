@@ -11,6 +11,10 @@ export const EMPTY_INTERN_REQUIREMENTS = {
   groupTherapyHoursRequired: 0,
   relationalTherapyHoursRequired: 0, // 0 = not applicable
   adminHoursRequired: 0,
+  // Hour types that ALSO count toward the Direct Contact requirement for this
+  // person, e.g. ['group_therapy', 'relational_therapy']. Credited hours are not
+  // double-counted in the total. See progressByType() in hourEntriesApi.
+  directCreditTypes: [],
 };
 
 export async function fetchInternProfile(providerName) {

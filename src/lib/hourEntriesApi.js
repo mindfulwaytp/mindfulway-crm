@@ -158,11 +158,23 @@ export async function resolveChangeRequest(reqId) {
 // Weeks are UTC-midnight-aligned to match how entry dates are stored, so an
 // entry never lands in the wrong week bucket.
 
+/**
+ * Monday of the week containing `date`, as UTC midnight.
+ * Accepts a Date (read as its LOCAL calendar day) or a 'YYYY-MM-DD' string.
+ * toDateOnly() already distinguishes the two — routing a string through
+ * `new Date(str)` first would read UTC-midnight back out in local time and
+ * land on the previous day.
+ */
 export function getMondayOf(date) {
-  const d = toDateOnly(date instanceof Date ? date : new Date(date));
+  const d = toDateOnly(date);
   const day = d.getUTCDay();
   d.setUTCDate(d.getUTCDate() - (day === 0 ? 6 : day - 1));
   return d;
+}
+
+/** A UTC-midnight Date → 'YYYY-MM-DD', for binding to <input type="date">. */
+export function dateToStr(d) {
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`;
 }
 
 /** Shift a Monday by whole weeks. UTC arithmetic, so DST can't knock it off midnight. */
@@ -195,4 +207,47 @@ export function sumByType(entries) {
     if (totals[e.type] !== undefined) totals[e.type] += e.hours;
   });
   return totals;
+}
+
+// ── Direct-contact credit ─────────────────────────────────────────────────────
+// Some interns/associates may count their group and/or relational hours toward
+// their Direct Contact requirement as well. The hours are logged ONCE, so they
+// must never be added twice to the grand total — the credit applies only to the
+// Direct Contact requirement bar. Which types are credited is per-profile.
+
+/** The only hour types that can be credited toward Direct Contact. */
+export const CREDITABLE_TO_DIRECT = ['group_therapy', 'relational_therapy'];
+
+/** Types this intern's profile credits toward Direct Contact (defaults to none). */
+export function directCreditTypes(profile) {
+  const configured = profile?.directCreditTypes;
+  if (!Array.isArray(configured)) return [];
+  return CREDITABLE_TO_DIRECT.filter((t) => configured.includes(t));
+}
+
+/**
+ * Hours counted against each REQUIREMENT — not a tally of hours worked.
+ * Direct Contact absorbs the credited types on top of its own entries, so this
+ * intentionally sums to more than the hours actually logged. Never derive the
+ * grand total from this; use totalLoggedHours(), which counts each entry once.
+ */
+export function progressByType(entries, profile) {
+  const raw = sumByType(entries);
+  const credited = { ...raw };
+  directCreditTypes(profile).forEach((t) => {
+    credited.direct_contact += raw[t] || 0;
+  });
+  return credited;
+}
+
+/** Total hours actually logged — each entry counted exactly once. */
+export function totalLoggedHours(entries) {
+  return Object.values(sumByType(entries)).reduce((s, v) => s + v, 0);
+}
+
+/** ['group_therapy','relational_therapy'] → "Group Therapy & Relational Therapy" */
+export function creditLabel(types) {
+  const labels = types.map((t) => HOUR_TYPES.find((h) => h.key === t)?.label || t);
+  if (labels.length <= 1) return labels[0] || '';
+  return `${labels.slice(0, -1).join(', ')} & ${labels[labels.length - 1]}`;
 }
