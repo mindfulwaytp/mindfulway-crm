@@ -141,6 +141,21 @@ service cloud.firestore {
       allow update, delete: if isAdmin() || isSupervisor();
     }
 
+    // ── Recurring tasks ──────────────────────────────────────────────────────
+    // - Any signed-in staff can read (they need to see their assignments)
+    // - Admin/supervisor create, edit, delete task definitions
+    // - Completions: a person marks their OWN task done; admin/supervisor any
+    match /tasks/{taskId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isSupervisor();
+
+      match /completions/{providerName} {
+        allow read: if isSignedIn();
+        allow write: if isSupervisor() ||
+          (isSignedIn() && getUserData().providerName == providerName);
+      }
+    }
+
     // ── Users — own read/create; admin full access ────────────────────────────
     match /users/{uid} {
       allow read: if isSignedIn() && request.auth.uid == uid;

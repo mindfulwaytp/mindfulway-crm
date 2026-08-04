@@ -75,6 +75,22 @@ const HUB_ITEMS = [
     ),
   },
   {
+    id: 'tasks',
+    label: 'Tasks',
+    description: 'Recurring responsibilities & to-dos',
+    path: '/tasks',
+    adminOnly: false,
+    color: '#ca8a04',
+    bg: '#fefce8',
+    border: '#fde047',
+    icon: (
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M9 11l3 3L22 4"/>
+        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/>
+      </svg>
+    ),
+  },
+  {
     id: 'intranet',
     label: 'Intranet',
     description: 'Staff updates, posts & announcements',

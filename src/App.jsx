@@ -44,6 +44,7 @@ import PersonnelFilesPage from './pages/PersonnelFilesPage';
 import PersonnelHubPage from './pages/PersonnelHubPage';
 import RequirementsPage from './pages/RequirementsPage';
 import AvailabilityPage from './pages/AvailabilityPage';
+import TasksPage from './pages/TasksPage';
 import MyHoursPage from './pages/MyHoursPage';
 import InternHoursPage from './pages/InternHoursPage';
 import LoginPage from './pages/LoginPage';
@@ -1304,6 +1305,7 @@ export default function App() {
     return (
       <Routes>
         <Route path="/" element={<HubPage />} />
+        <Route path="/tasks" element={<TasksPage />} />
         {/* All admin app paths handled by AdminApp — single instance preserves state */}
         <Route path="/*" element={
           <AdminApp
@@ -1326,6 +1328,7 @@ export default function App() {
     return (
       <Routes>
         <Route path="/" element={<HubPage />} />
+        <Route path="/tasks" element={<TasksPage />} />
         <Route path="/*" element={<ProviderApp signOut={signOut} />} />
       </Routes>
     );
@@ -1335,6 +1338,7 @@ export default function App() {
     return (
       <Routes>
         <Route path="/" element={<HubPage />} />
+        <Route path="/tasks" element={<TasksPage />} />
         <Route path="/intranet" element={<IntranetPage />} />
         <Route path="/intranet/news" element={<IntranetNewsPage />} />
         <Route path="/intranet/resources" element={<IntranetResourcesPage />} />

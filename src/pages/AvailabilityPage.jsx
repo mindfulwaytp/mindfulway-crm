@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../lib/AuthContext';
+import { serverTimestamp } from 'firebase/firestore';
 import { fetchProviderProfiles, upsertProviderProfile } from '../lib/providersProfileApi';
 import NotificationBell from '../components/NotificationBell';
 import { DAYS, SLOTS, getAvailability, toggleSlot, toProfileFields } from '../lib/availability';
@@ -37,12 +38,23 @@ export default function AvailabilityPage({ onNav }) {
   }
 
   async function saveFields(name, fields) {
+    // Every edit on this page is an availability change, so stamp who/when.
+    const editor = providerName || user?.email || 'Unknown';
     setSaveState((s) => ({ ...s, [name]: 'saving' }));
+    // Optimistic: show a client-side time immediately (Firestore Timestamp shape
+    // so the same formatter works before and after the server value lands).
+    const localStamp = clientStamp();
     setProfiles((prev) =>
-      prev.map((p) => (p.name === name ? { ...p, ...fields } : p))
+      prev.map((p) => (p.name === name
+        ? { ...p, ...fields, availabilityUpdatedBy: editor, availabilityUpdatedAt: localStamp }
+        : p))
     );
     try {
-      await upsertProviderProfile(name, fields);
+      await upsertProviderProfile(name, {
+        ...fields,
+        availabilityUpdatedBy: editor,
+        availabilityUpdatedAt: serverTimestamp(),
+      });
       setSaveState((s) => ({ ...s, [name]: 'saved' }));
       setTimeout(() => setSaveState((s) => ({ ...s, [name]: null })), 2000);
     } catch (e) {
@@ -209,6 +221,12 @@ export default function AvailabilityPage({ onNav }) {
                             </span>
                           )}
                         </div>
+                        {p.availabilityUpdatedAt && (
+                          <div style={{ fontSize: 11, fontWeight: 400, color: '#9ca3af', marginTop: 3, lineHeight: 1.4 }}>
+                            Updated {formatUpdatedAt(p.availabilityUpdatedAt)}
+                            {p.availabilityUpdatedBy ? ` by ${p.availabilityUpdatedBy}` : ''}
+                          </div>
+                        )}
                       </td>
 
                       {/* Open Spots */}
@@ -308,6 +326,19 @@ export default function AvailabilityPage({ onNav }) {
       </div>
     </div>
   );
+}
+
+/** Current time as a Firestore-Timestamp-shaped object, for optimistic display. */
+function clientStamp() {
+  return { seconds: Math.floor(Date.now() / 1000) };
+}
+
+/** Firestore Timestamp (or {seconds}) → "Jul 16, 2026, 3:42 PM". */
+function formatUpdatedAt(ts) {
+  if (!ts?.seconds) return '';
+  return new Date(ts.seconds * 1000).toLocaleString('en-US', {
+    month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit',
+  });
 }
 
 function OpenBadge({ count }) {
