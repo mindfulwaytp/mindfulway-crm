@@ -48,6 +48,7 @@ import TasksPage from './pages/TasksPage';
 import MyHoursPage from './pages/MyHoursPage';
 import InternHoursPage from './pages/InternHoursPage';
 import LoginPage from './pages/LoginPage';
+import CRMWiki from './components/crm-wiki';
 import { parseChecklist } from './lib/specialtyMap';
 import { matchProviders } from './lib/matchProviders';
 import { fetchProviderProfiles } from './lib/providersProfileApi';
@@ -1306,6 +1307,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<HubPage />} />
         <Route path="/tasks" element={<TasksPage />} />
+        <Route path="/wiki" element={<WikiPage />} />
         {/* All admin app paths handled by AdminApp — single instance preserves state */}
         <Route path="/*" element={
           <AdminApp
@@ -1329,6 +1331,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<HubPage />} />
         <Route path="/tasks" element={<TasksPage />} />
+        <Route path="/wiki" element={<WikiPage />} />
         <Route path="/*" element={<ProviderApp signOut={signOut} />} />
       </Routes>
     );
@@ -1344,6 +1347,7 @@ export default function App() {
         <Route path="/intranet/resources" element={<IntranetResourcesPage />} />
         <Route path="/intranet/policies" element={<IntranetPoliciesPage />} />
         <Route path="/availability" element={<AvailabilityWithNav />} />
+        <Route path="/wiki" element={<WikiPage />} />
         <Route path="/hours" element={(isIntern || isAssociate) ? <MyHoursPage /> : <InternHoursPage />} />
         {isSupervisor && (
           <>
@@ -1364,6 +1368,26 @@ export default function App() {
 function AvailabilityWithNav() {
   const navigate = useNavigate();
   return <AvailabilityPage onNav={() => navigate('/hours')} />;
+}
+
+// Full-screen wiki with a thin bar back to the Hub. Everyone can read;
+// admins can create/edit/delete pages.
+function WikiPage() {
+  const navigate = useNavigate();
+  const { isAdmin } = useAuth();
+  return (
+    <div style={{ minHeight: '100vh', background: '#f7f7f8' }}>
+      <div style={{ background: '#fff', borderBottom: '1px solid #e5e7eb', padding: '10px 20px' }}>
+        <button
+          onClick={() => navigate('/')}
+          style={{ border: '1px solid #e5e7eb', background: '#fff', borderRadius: 10, padding: '8px 14px', cursor: 'pointer', fontWeight: 600, color: '#6b7280', fontSize: 13 }}
+        >
+          ← Hub
+        </button>
+      </div>
+      <CRMWiki canEdit={isAdmin} />
+    </div>
+  );
 }
 
 function ProviderApp({ signOut }) {
@@ -1419,6 +1443,10 @@ function ProviderApp({ signOut }) {
 
           <button onClick={() => navigate('/personnel')} style={navBtn(view === 'personnel')}>
             My Files
+          </button>
+
+          <button onClick={() => navigate('/wiki')} style={navBtn(false)}>
+            Wiki
           </button>
 
           <button onClick={signOut} style={{ ...navBtn(false), color: '#6b7280', marginTop: 'auto' }}>
@@ -1953,6 +1981,21 @@ function AdminApp({ signOut, intakes, setIntakes, providerProfiles, setProviderP
             }}
           >
             Intranet
+          </button>
+
+          <button
+            onClick={() => navigate('/wiki')}
+            style={{
+              textAlign: 'left',
+              padding: '12px 14px',
+              borderRadius: 10,
+              border: '1px solid #e5e7eb',
+              background: '#fff',
+              fontWeight: 600,
+              cursor: 'pointer',
+            }}
+          >
+            Wiki
           </button>
 
           <button

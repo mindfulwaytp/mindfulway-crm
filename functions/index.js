@@ -67,9 +67,23 @@ export const jotformWebhook = onRequest(async (req, res) => {
     const providerSnap = await db.collection("providers").get();
     const providerNames = providerSnap.docs.map((d) => d.id);
 
-    const preferredProviders = Array.isArray(raw.q7_pleaseIndicate)
-      ? raw.q7_pleaseIndicate.map((v) => matchProvider(v, providerNames)).join(", ")
-      : matchProvider(raw.q7_pleaseIndicate, providerNames);
+    // Preferred provider — resolved by the field's JotForm "unique name" rather
+    // than a fixed `q{n}_` key. Editing the question wording changes that key
+    // (it went from `pleaseIndicate` to `indicateAny`), which silently blanked
+    // this field before. Matching the unique name survives future wording edits.
+    let rawPreferred = rawFieldByUniqueName(raw, "indicateAny");
+    if (rawPreferred === undefined) {
+      rawPreferred = rawFieldByUniqueName(raw, "pleaseIndicate"); // legacy name
+    }
+    if (rawPreferred === undefined) {
+      logger.warn(
+        `PREFERRED_PROVIDER_FIELD_NOT_FOUND ${submissionId} keys=${JSON.stringify(Object.keys(raw))}`
+      );
+    }
+
+    const preferredProviders = Array.isArray(rawPreferred)
+      ? rawPreferred.map((v) => matchProvider(v, providerNames)).join(", ")
+      : matchProvider(rawPreferred, providerNames);
 
     const servicesRequested = Array.isArray(raw.q10_whatType)
       ? raw.q10_whatType.join(", ")
@@ -323,6 +337,19 @@ function buildPostEmailHtml({ authorName, categoryLabel, content }) {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+// JotForm rawRequest keys are `q{qid}_{uniqueName}`. The qid can shift when a
+// form is edited, so look a field up by its stable unique-name suffix instead of
+// a hardcoded key. Returns undefined if no field with that unique name exists.
+function rawFieldByUniqueName(raw, uniqueName) {
+  const target = uniqueName.toLowerCase();
+  const key = Object.keys(raw).find((k) => {
+    const underscore = k.indexOf("_");
+    const slug = underscore >= 0 ? k.slice(underscore + 1) : k;
+    return slug.toLowerCase() === target;
+  });
+  return key ? raw[key] : undefined;
+}
 
 function matchProvider(raw, providerNames = []) {
   if (!raw) return "";

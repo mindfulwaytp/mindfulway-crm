@@ -526,8 +526,10 @@ function CeuProgressSection({ providerName, settings, records, reqContributions 
   const [proofFile, setProofFile] = useState(null);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+  const [saveError, setSaveError] = useState('');
 
   function openSettingsEdit() {
+    setSaveError('');
     setSettingsDraft({
       requiredHours: settings?.requiredHours ?? '',
       cycleMonths: String(settings?.cycleMonths ?? '12'),
@@ -538,6 +540,7 @@ function CeuProgressSection({ providerName, settings, records, reqContributions 
 
   async function handleSettingsSave() {
     setSaving(true);
+    setSaveError('');
     try {
       const s = {
         requiredHours: Number(settingsDraft.requiredHours),
@@ -546,24 +549,38 @@ function CeuProgressSection({ providerName, settings, records, reqContributions 
       };
       await onSettingsSave(s);
       setEditingSettings(false);
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+      setSaveError(e?.message || 'Could not save settings. Please try again.');
+    }
     finally { setSaving(false); }
   }
 
   async function handleRecordAdd() {
     setSaving(true);
+    setSaveError('');
     try {
       let proofUrl = '';
       if (proofFile) {
-        const fileRef = storageRef(storage, `ceu-proofs/${providerName}/${Date.now()}-${proofFile.name}`);
-        await uploadBytes(fileRef, proofFile);
-        proofUrl = await getDownloadURL(fileRef);
+        // A proof upload failure must not silently kill the whole record save —
+        // save the record without the attachment and tell the user.
+        try {
+          const fileRef = storageRef(storage, `ceu-proofs/${providerName}/${Date.now()}-${proofFile.name}`);
+          await uploadBytes(fileRef, proofFile);
+          proofUrl = await getDownloadURL(fileRef);
+        } catch (uploadErr) {
+          console.error(uploadErr);
+          setSaveError(`Record saved, but the proof file could not be uploaded (${uploadErr?.message || 'upload failed'}).`);
+        }
       }
       await onRecordAdd({ ...recordDraft, proofUrl });
       setShowAddForm(false);
       setRecordDraft(EMPTY_CEU_RECORD);
       setProofFile(null);
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+      setSaveError(e?.message || 'Could not save this CEU record. Please try again.');
+    }
     finally { setSaving(false); }
   }
 
@@ -611,6 +628,14 @@ function CeuProgressSection({ providerName, settings, records, reqContributions 
           </button>
         )}
       </div>
+
+      {/* Save error / warning banner */}
+      {saveError && (
+        <div style={{ background: '#fef2f2', border: '1px solid #fecaca', color: '#b91c1c', borderRadius: 8, padding: '8px 12px', fontSize: 12, marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+          <span>{saveError}</span>
+          <button onClick={() => setSaveError('')} style={{ border: 'none', background: 'transparent', color: '#b91c1c', cursor: 'pointer', fontWeight: 700, fontSize: 14, lineHeight: 1 }}>×</button>
+        </div>
+      )}
 
       {/* Settings edit form */}
       {editingSettings && (
@@ -691,7 +716,7 @@ function CeuProgressSection({ providerName, settings, records, reqContributions 
               </div>
               {!showAddForm && (
                 <button
-                  onClick={() => setShowAddForm(true)}
+                  onClick={() => { setSaveError(''); setShowAddForm(true); }}
                   style={{ padding: '4px 12px', borderRadius: 6, border: '1px solid #c4b5fd', background: '#fff', color: '#7c3aed', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}
                 >
                   + Add CEU
@@ -824,43 +849,66 @@ function CeuProgressSection({ providerName, settings, records, reqContributions 
 
 // ── CEU History tab ───────────────────────────────────────────────────────────
 
-function CeuHistoryEntry({ entry }) {
+function CeuHistoryEntry({ entry, onDelete, deleting }) {
   return (
-    <div style={{ background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: '10px 14px' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 3 }}>
-        <span style={{ fontWeight: 600, fontSize: 13, color: '#111827' }}>{entry.label}</span>
-        {entry.type === 'req' && (
-          <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 20, background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', fontWeight: 600 }}>
-            from requirements
-          </span>
-        )}
+    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, padding: '10px 14px' }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', marginBottom: 3 }}>
+          <span style={{ fontWeight: 600, fontSize: 13, color: '#111827' }}>{entry.label}</span>
+          {entry.type === 'req' && (
+            <span style={{ fontSize: 11, padding: '1px 6px', borderRadius: 20, background: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', fontWeight: 600 }}>
+              from requirements
+            </span>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {entry.hours && (
+            <span style={{ fontSize: 12, padding: '1px 7px', borderRadius: 20, background: '#ede9fe', color: '#6d28d9', border: '1px solid #c4b5fd', fontWeight: 600 }}>
+              {entry.hours} hrs
+            </span>
+          )}
+          {entry.category && <span style={{ fontSize: 12, color: '#6b7280' }}>{entry.category}</span>}
+          {entry.date && <span style={{ fontSize: 12, color: '#6b7280' }}>{formatDate(entry.date)}</span>}
+          {entry.organization && <span style={{ fontSize: 12, color: '#6b7280' }}>{entry.organization}</span>}
+          {entry.notes && <span style={{ fontSize: 12, color: '#9ca3af', fontStyle: 'italic' }}>{entry.notes}</span>}
+          {entry.proofUrl && (
+            <a href={entry.proofUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: '#7c3aed', fontWeight: 600 }}>
+              View PDF →
+            </a>
+          )}
+        </div>
       </div>
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        {entry.hours && (
-          <span style={{ fontSize: 12, padding: '1px 7px', borderRadius: 20, background: '#ede9fe', color: '#6d28d9', border: '1px solid #c4b5fd', fontWeight: 600 }}>
-            {entry.hours} hrs
-          </span>
-        )}
-        {entry.category && <span style={{ fontSize: 12, color: '#6b7280' }}>{entry.category}</span>}
-        {entry.date && <span style={{ fontSize: 12, color: '#6b7280' }}>{formatDate(entry.date)}</span>}
-        {entry.organization && <span style={{ fontSize: 12, color: '#6b7280' }}>{entry.organization}</span>}
-        {entry.notes && <span style={{ fontSize: 12, color: '#9ca3af', fontStyle: 'italic' }}>{entry.notes}</span>}
-        {entry.proofUrl && (
-          <a href={entry.proofUrl} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: '#7c3aed', fontWeight: 600 }}>
-            View PDF →
-          </a>
-        )}
-      </div>
+      {/* Only manually-added CEUs are deletable; requirement-based entries are auto-counted */}
+      {entry.type === 'manual' && onDelete && (
+        <button
+          onClick={() => onDelete(entry.recordId)}
+          disabled={deleting}
+          style={{ padding: '4px 10px', borderRadius: 6, border: '1px solid #fca5a5', background: '#fff', color: '#dc2626', fontSize: 12, fontWeight: 600, cursor: deleting ? 'default' : 'pointer', flexShrink: 0 }}
+        >
+          {deleting ? '…' : 'Delete'}
+        </button>
+      )}
     </div>
   );
 }
 
-function CeuHistoryTab({ loading, settings, records, reqContributions }) {
+function CeuHistoryTab({ loading, settings, records, reqContributions, onRecordDelete }) {
+  const [deletingId, setDeletingId] = useState(null);
+
+  async function handleDelete(recordId) {
+    if (!recordId || !onRecordDelete) return;
+    if (!window.confirm('Delete this CEU record?')) return;
+    setDeletingId(recordId);
+    try { await onRecordDelete(recordId); }
+    catch (e) { console.error(e); }
+    finally { setDeletingId(null); }
+  }
+
   if (loading) return <div style={{ color: '#9ca3af', fontSize: 13, padding: '24px 0' }}>Loading…</div>;
 
   const allEntries = [
     ...records.map((r) => ({
-      key: `m-${r.id}`, type: 'manual', date: r.completionDate || '',
+      key: `m-${r.id}`, type: 'manual', recordId: r.id, date: r.completionDate || '',
       label: r.title || 'Untitled', hours: r.hours,
       category: r.category, organization: r.organization, notes: r.notes, proofUrl: r.proofUrl,
     })),
@@ -888,7 +936,7 @@ function CeuHistoryTab({ loading, settings, records, reqContributions }) {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
         <div style={{ fontSize: 12, color: '#9ca3af', marginBottom: 4 }}>{totalHours.toFixed(1)} total hours on file</div>
-        {sorted.map((entry) => <CeuHistoryEntry key={entry.key} entry={entry} />)}
+        {sorted.map((entry) => <CeuHistoryEntry key={entry.key} entry={entry} onDelete={handleDelete} deleting={deletingId === entry.recordId} />)}
       </div>
     );
   }
@@ -948,7 +996,7 @@ function CeuHistoryTab({ loading, settings, records, reqContributions }) {
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {[...group.entries].sort((a, b) => b.date.localeCompare(a.date)).map((entry) => (
-                  <CeuHistoryEntry key={entry.key} entry={entry} />
+                  <CeuHistoryEntry key={entry.key} entry={entry} onDelete={handleDelete} deleting={deletingId === entry.recordId} />
                 ))}
               </div>
             )}
@@ -962,7 +1010,7 @@ function CeuHistoryTab({ loading, settings, records, reqContributions }) {
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {[...unassigned].sort((a, b) => b.date.localeCompare(a.date)).map((entry) => (
-              <CeuHistoryEntry key={entry.key} entry={entry} />
+              <CeuHistoryEntry key={entry.key} entry={entry} onDelete={handleDelete} deleting={deletingId === entry.recordId} />
             ))}
           </div>
         </div>
@@ -1582,6 +1630,7 @@ export default function PersonnelFilesPage({ lockedProvider = null }) {
                 loading={loadingCompliance}
                 settings={complianceData[selectedProvider]?.ceuSettings ?? null}
                 records={complianceData[selectedProvider]?.ceuRecords ?? []}
+                onRecordDelete={handleCeuRecordDelete}
                 reqContributions={(() => {
                   const cd = complianceData[selectedProvider];
                   if (!cd) return [];

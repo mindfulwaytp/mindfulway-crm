@@ -105,6 +105,22 @@ const HUB_ITEMS = [
       </svg>
     ),
   },
+  {
+    id: 'wiki',
+    label: 'Wiki',
+    description: 'CRM knowledge base & documentation',
+    path: '/wiki',
+    adminOnly: false,
+    color: '#0d9488',
+    bg: '#f0fdfa',
+    border: '#99f6e4',
+    icon: (
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+      </svg>
+    ),
+  },
 ];
 
 export default function HubPage() {

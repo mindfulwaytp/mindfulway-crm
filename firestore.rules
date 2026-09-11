@@ -187,6 +187,12 @@ service cloud.firestore {
       }
     }
 
+    // ── Wiki / knowledge base — signed-in read; admin write ───────────────────
+    match /wiki_pages/{pageId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
     // ── Config — signed-in read; no client writes ─────────────────────────────
     match /config/{docId} {
       allow read: if isSignedIn();
